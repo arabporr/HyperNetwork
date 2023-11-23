@@ -51,6 +51,10 @@ class Projection_Problem:
         self.Sigma = torch.eye(1)
         self.Lambda = 0
         self.memory = 0
+        self.X = [] 
+        self.Drift = []
+        self.Diffusion = []
+        self.input_output_pairs = []
     
     def mu(self, X):
         raise NotImplementedError()
@@ -88,13 +92,63 @@ class Projection_Problem:
                 X.append(x_t1)
                 Drift.append(drift_t)
                 Diffusion.append(diffusion_t)
-
+        
         X_all = torch.stack(X, dim=1)
         Drift_all = torch.stack(Drift, dim=1)
         Diffusion_all = torch.stack(Diffusion, dim=1)
-        X = X_all[:, 2:, :]
-        return X
 
+        X = X_all[:, 2:, :]
+        Drift = Drift_all[:, 2:, :]
+        Diffusion = Diffusion_all[:, 2:, :]
+
+        self.X = X
+        self.Drift = Drift
+        self.Diffusion = Diffusion
+
+        return X
+    
+    def Algorithm1(self):
+        N = self.N
+        T = self.T 
+        d = self.d 
+        Sigma = self.Sigma 
+        Lambda = self.Lambda 
+        #memory = self.memory
+        X = self.X 
+        Drift = self.Drift
+        #Diffusion = self.Diffusion
+        sigma_2 = torch.matrix_power(Sigma,2)
+        sigma_neg_2 = torch.matrix_power(torch.linalg.pinv(Sigma), 2)
+        Z_N = []
+        for n in range(N):
+            x_n = X[n]
+            drift_n = Drift[n]
+            Y_X = []
+            for t in range(T-1):
+                x_t = x_n[t+1] # the X was indexed from -1
+                drift_t = drift_n[t+1] # Drift_n_t (indexes for drift are one ahead)
+                mu_x_t =  x_t + drift_t
+                sigma_x_t = torch.mul(
+                    self.varsigma(x_t),
+                    torch.matmul(
+                        sigma_2,
+                        torch.from_numpy(frac_mat_pow(
+                            torch.matmul(
+                                sigma_neg_2,
+                                torch.matrix_power(
+                                    torch.add(
+                                        torch.mul(Lambda, torch.eye(d)),
+                                        torch.mul(torch.squeeze(self.varsigma(x_t), 2), Sigma))
+                                    , 2)
+                                )
+                            , 1/2)).type(torch.FloatTensor)
+                        )
+                    )
+                Y_X.append([mu_x_t, sigma_x_t])
+            Z = [x_n, Y_X]
+            Z_N.append(Z)
+        self.input_output_pairs = Z_N
+        return self.input_output_pairs
 
 class OU_Projection_Problem(Projection_Problem):
     def __init__(self):

@@ -87,7 +87,7 @@ class Projection_Problem:
                 drift_t = memory * self.mu(X[t-2]) + (1-memory) * self.mu(X[t-1])     # Drift[t] but in place [t+1]
                 eye_reshaped = torch.eye(d).reshape([1,d,d])
                 B_reshaped = B.reshape([N, 1])
-                diffusion_t = torch.einsum("nij,jk,nk->ni", self.varsigma(X[t-1]), Sigma, Z) + ((B_reshaped * Lambda) * Z) # Diffusion[t] but in place [t+1]
+                diffusion_t = torch.einsum("n,ik,nk->ni", self.varsigma(X[t-1]), Sigma, Z) + ((B_reshaped * Lambda) * Z) # Diffusion[t] but in place [t+1]
                 x_t1 = X[t-1] + drift_t + diffusion_t  # X[t+1]
                 X.append(x_t1)
                 Drift.append(drift_t)
@@ -120,34 +120,33 @@ class Projection_Problem:
         sigma_2 = torch.matrix_power(Sigma,2)
         sigma_neg_2 = torch.matrix_power(torch.linalg.pinv(Sigma), 2)
         Z_N = []
-        for n in range(N):
-            x_n = X[n]
-            drift_n = Drift[n]
-            Y_X = []
-            for t in range(T-1):
-                x_t = x_n[t+1] # the X was indexed from -1
-                drift_t = drift_n[t+1] # Drift_n_t (indexes for drift are one ahead)
-                mu_x_t =  x_t + drift_t
-                sigma_x_t = torch.mul(
-                    self.varsigma(x_t),
-                    torch.matmul(
-                        sigma_2,
-                        torch.from_numpy(frac_mat_pow(
-                            torch.matmul(
-                                sigma_neg_2,
-                                torch.matrix_power(
-                                    torch.add(
-                                        torch.mul(Lambda, torch.eye(d)),
-                                        torch.mul(torch.squeeze(self.varsigma(x_t), 2), Sigma))
-                                    , 2)
-                                )
-                            , 1/2)).type(torch.FloatTensor)
-                        )
-                    )
-                Y_X.append([mu_x_t, sigma_x_t])
-            Z = [x_n, Y_X]
-            Z_N.append(Z)
-        self.input_output_pairs = Z_N
+        Y = torch.Tensor.new_empty(N, T, d*(d+1)/2)
+
+        # for n in range(N):
+        #     x_n = X[n]
+        #     drift_n = Drift[n]
+        #     Y_X = []
+        for t in range(T-1):
+            x_t = X[:, t+1, :] # the X was indexed from -1
+            drift_t = Drift[:, t+1, :] # Drift_n_t (indexes for drift are one ahead)
+            mu_x_t =  x_t + drift_t
+
+            # iner_power_arg = torch.add(
+            #         torch.mul(Lambda, torch.eye(d)),
+            #         torch.mul(torch.squeeze(self.varsigma(x_t), 2), Sigma))
+            iner_power_arg = Lambda * torch.einsum("a,ij->aij", self.varsigma(x_t), Sigma)
+            iner_power = torch.matrix_power(iner_power_arg, 2)
+
+
+            outer_power_arg = torch.einsum("ij,ajk->aik", sigma_neg_2, iner_power)
+            #outer_power = torch.from_numpy( frac_mat_pow(outer_power_arg, 1/2)).type(torch.FloatTensor) 
+            outer_power = outer_power_arg**(1/2)
+            sigma_x_t = torch.einsum("a,ij,ajk->aik", self.varsigma(x_t), sigma_2, outer_power)
+            
+            # Y_X.append([mu_x_t, sigma_x_t]) #
+            # Z = [x_n, Y_X]
+            # Z_N.append(Z)
+        self.input_output_pairs = sigma_x_t
         return self.input_output_pairs
 
 class OU_Projection_Problem(Projection_Problem):
@@ -161,6 +160,6 @@ class OU_Projection_Problem(Projection_Problem):
         return (self.long_term_mean - X) * self.mean_reversion
 
     def varsigma(self, X):
-        return torch.ones([X.shape[0], 1, 1]) * self.volitality
+        return torch.ones(X.shape[0]) * self.volitality
   
 

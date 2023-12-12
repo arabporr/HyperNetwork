@@ -74,7 +74,6 @@ class Projection_Problem:
         X = [] 
         Drift = []
         Diffusion = []
-
         for t in range(T+1):
             if t == 0:
                 X.append(torch.zeros(N, d)) # X[-1]
@@ -93,22 +92,18 @@ class Projection_Problem:
                 X.append(x_t)
                 Drift.append(drift_t)
                 Diffusion.append(diffusion_t)
-        
-        X_NTd = torch.stack(X, dim=1)
+        X_NTd = torch.stack(X, dim=1) 
         Drift_NTd = torch.stack(Drift, dim=1)
         Diffusion_NTd = torch.stack(Diffusion, dim=1)
-
-        self.X = X_NTd[:, 2:, :]
-        self.Drift = Drift_NTd[:, 2:, :]
-        self.Diffusion = Diffusion_NTd[:, 2:, :]
-        
-        return X
+        self.X = X_NTd[:, 0:, :] # t = -1 to t = T
+        self.Drift = Drift_NTd[:, 0:, :] # t = -1 to t = T
+        self.Diffusion = Diffusion_NTd[:, 0:, :] # t = -1 to t = T
+        return self.X
     
     def Algorithm1(self):
         N = self.N
         T = self.T 
         d = self.d
-        Mu = self.mu
         Varsigma = self.varsigma 
         Sigma = self.Sigma 
         Lambda = self.Lambda 
@@ -116,22 +111,20 @@ class Projection_Problem:
         Drift = self.Drift
         sigma_2 = torch.matrix_power(Sigma,2)
         sigma_neg_2 = torch.matrix_power(torch.linalg.pinv(Sigma), 2)
-        Y = torch.Tensor.new_empty(N, T, d*(d+1)/2)
-
-        for t in range(T-1):
-            x_t = X[:, t+1, :] # the X was indexed from -1
-            drift_t = Drift[:, t+1, :] # Drift_n_t (indexes for drift are one ahead)
-            mu_x_t =  x_t + drift_t
-
-            iner_power_arg = Lambda * torch.einsum("a,ij->aij", Varsigma(x_t), Sigma)
-            iner_power = torch.matrix_power(iner_power_arg, 2)
-
-            outer_power_arg = torch.einsum("ij,ajk->aik", sigma_neg_2, iner_power)
+        Z = []
+        for t in range(1, T+2):
+            x_t_1 = X[:, t-1, :]
+            x_t = X[:, t, :]
+            drift_t = Drift[:, t, :]
+            mu_x_t =  x_t_1 + drift_t # N x d
+            inner_power_arg = Lambda * torch.ones(N,d) +  torch.einsum("nd,dk->nk", Varsigma(x_t_1), Sigma)
+            inner_power = inner_power_arg**2
+            outer_power_arg = torch.einsum("nd,dk->nk", inner_power, sigma_neg_2)
             outer_power = outer_power_arg**(1/2)
-
-            sigma_x_t = torch.einsum("a,ij,ajk->aik", Varsigma(x_t), sigma_2, outer_power)
-            
-        self.input_output_pairs = sigma_x_t
+            sigma_x_t = torch.einsum("nd,dk->nk",outer_power, sigma_2) * Varsigma(x_t_1) # N x d
+            Y = torch.cat((mu_x_t, sigma_x_t), dim = -1)
+            Z.append([x_t, Y])
+        self.input_output_pairs = Z
         return self.input_output_pairs
 
 class OU_Projection_Problem(Projection_Problem):
@@ -145,6 +138,6 @@ class OU_Projection_Problem(Projection_Problem):
         return (self.long_term_mean - X) * self.mean_reversion
 
     def varsigma(self, X):
-        return torch.ones(X.shape[0]) * self.volitality
+        return torch.ones(X.shape) * self.volitality
   
 

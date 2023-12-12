@@ -33,7 +33,7 @@ def setup_gpu(seed=42):
     torch.backends.cudnn.benchmark = False
     # Fetching the device that will be used throughout this notebook
     device = torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda:0")
-    print("Using device", device)
+    print("Using device -> ", device)
 
 def fan_diagram(X):
     quantiles = torch.quantile(X, torch.tensor([0.05, 0.5, 0.95]), dim=0)
@@ -48,7 +48,7 @@ class Projection_Problem:
         self.N = 1000
         self.T = 100
         self.d = 1
-        self.Sigma = torch.eye(1)
+        self.Sigma = torch.eye(self.d)
         self.Lambda = 0
         self.memory = 0
         self.X = [] 
@@ -62,10 +62,12 @@ class Projection_Problem:
     def varsigma(self, X):
         raise NotImplementedError()
 
-    def simulate_x(self):
+    def Algorithm3(self):
         N = self.N
         T = self.T 
-        d = self.d 
+        d = self.d
+        Mu = self.mu
+        Varsigma = self.varsigma 
         Sigma = self.Sigma 
         Lambda = self.Lambda 
         memory = self.memory
@@ -84,68 +86,51 @@ class Projection_Problem:
             else:
                 Z = torch.randn(N, d)
                 B = torch.bernoulli(torch.tensor([0.5]*N))
-                drift_t = memory * self.mu(X[t-2]) + (1-memory) * self.mu(X[t-1])     # Drift[t] but in place [t+1]
-                eye_reshaped = torch.eye(d).reshape([1,d,d])
-                B_reshaped = B.reshape([N, 1])
-                diffusion_t = torch.einsum("n,ik,nk->ni", self.varsigma(X[t-1]), Sigma, Z) + ((B_reshaped * Lambda) * Z) # Diffusion[t] but in place [t+1]
-                x_t1 = X[t-1] + drift_t + diffusion_t  # X[t+1]
-                X.append(x_t1)
+                drift_t = memory * Mu(X[t-2]) + (1-memory) * Mu(X[t-1])
+                S = torch.einsum("n,dk->nk", (B * Lambda), torch.eye(d))
+                diffusion_t = S + torch.einsum("nd,dk->nk", Varsigma(X[t-1]), Sigma)
+                x_t = X[t-1] + drift_t + (diffusion_t * Z)
+                X.append(x_t)
                 Drift.append(drift_t)
                 Diffusion.append(diffusion_t)
         
-        X_all = torch.stack(X, dim=1)
-        Drift_all = torch.stack(Drift, dim=1)
-        Diffusion_all = torch.stack(Diffusion, dim=1)
+        X_NTd = torch.stack(X, dim=1)
+        Drift_NTd = torch.stack(Drift, dim=1)
+        Diffusion_NTd = torch.stack(Diffusion, dim=1)
 
-        X = X_all[:, 2:, :]
-        Drift = Drift_all[:, 2:, :]
-        Diffusion = Diffusion_all[:, 2:, :]
-
-        self.X = X
-        self.Drift = Drift
-        self.Diffusion = Diffusion
-
+        self.X = X_NTd[:, 2:, :]
+        self.Drift = Drift_NTd[:, 2:, :]
+        self.Diffusion = Diffusion_NTd[:, 2:, :]
+        
         return X
     
     def Algorithm1(self):
         N = self.N
         T = self.T 
-        d = self.d 
+        d = self.d
+        Mu = self.mu
+        Varsigma = self.varsigma 
         Sigma = self.Sigma 
         Lambda = self.Lambda 
-        #memory = self.memory
         X = self.X 
         Drift = self.Drift
-        #Diffusion = self.Diffusion
         sigma_2 = torch.matrix_power(Sigma,2)
         sigma_neg_2 = torch.matrix_power(torch.linalg.pinv(Sigma), 2)
-        Z_N = []
         Y = torch.Tensor.new_empty(N, T, d*(d+1)/2)
 
-        # for n in range(N):
-        #     x_n = X[n]
-        #     drift_n = Drift[n]
-        #     Y_X = []
         for t in range(T-1):
             x_t = X[:, t+1, :] # the X was indexed from -1
             drift_t = Drift[:, t+1, :] # Drift_n_t (indexes for drift are one ahead)
             mu_x_t =  x_t + drift_t
 
-            # iner_power_arg = torch.add(
-            #         torch.mul(Lambda, torch.eye(d)),
-            #         torch.mul(torch.squeeze(self.varsigma(x_t), 2), Sigma))
-            iner_power_arg = Lambda * torch.einsum("a,ij->aij", self.varsigma(x_t), Sigma)
+            iner_power_arg = Lambda * torch.einsum("a,ij->aij", Varsigma(x_t), Sigma)
             iner_power = torch.matrix_power(iner_power_arg, 2)
 
-
             outer_power_arg = torch.einsum("ij,ajk->aik", sigma_neg_2, iner_power)
-            #outer_power = torch.from_numpy( frac_mat_pow(outer_power_arg, 1/2)).type(torch.FloatTensor) 
             outer_power = outer_power_arg**(1/2)
-            sigma_x_t = torch.einsum("a,ij,ajk->aik", self.varsigma(x_t), sigma_2, outer_power)
+
+            sigma_x_t = torch.einsum("a,ij,ajk->aik", Varsigma(x_t), sigma_2, outer_power)
             
-            # Y_X.append([mu_x_t, sigma_x_t]) #
-            # Z = [x_n, Y_X]
-            # Z_N.append(Z)
         self.input_output_pairs = sigma_x_t
         return self.input_output_pairs
 

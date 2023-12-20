@@ -34,6 +34,7 @@ def setup_gpu(seed=42):
     # Fetching the device that will be used throughout this notebook
     device = torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda:0")
     print("Using device -> ", device)
+    return device
 
 def fan_diagram(X):
     quantiles = torch.quantile(X, torch.tensor([0.05, 0.5, 0.95]), dim=0)

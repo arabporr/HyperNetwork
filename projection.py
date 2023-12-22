@@ -41,12 +41,11 @@ def setup_gpu(seed=42):
 
 def fan_diagram(X):
     quantiles = torch.quantile(X, torch.tensor([0.05, 0.5, 0.95]), dim=0)
-    fig = plt.figure(figsize=(16,8))
+    plt.figure(figsize=(16,8))
     plt.plot(quantiles[0])
     plt.plot(quantiles[1])
     plt.plot(quantiles[2])
     plt.plot(X[0])
-    fig.close()
 
 class Projection_Problem:
     def __init__(self):
@@ -137,7 +136,7 @@ class Projection_Problem:
             covariance = torch.einsum("n,ndk->ndk", Varsigma(x_t_1), outer_mul) # N x d x d
 
             Y = [mu_x_t, covariance]
-            Z.append([x_t, Y])
+            Z.append([torch.cat((x_t_1, x_t),dim=-1), Y])
         self.input_output_pairs = Z
         return self.input_output_pairs
 

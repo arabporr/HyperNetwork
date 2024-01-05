@@ -1,14 +1,8 @@
 ## Standard libraries
-import time
-import json
-import math
 import numpy as np
-import scipy
-from scipy.linalg import fractional_matrix_power as frac_mat_pow
 
 ## Imports for plotting
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 ## Progress bar
 from tqdm.notebook import tqdm
@@ -49,9 +43,9 @@ def fan_diagram(X):
 
 class Projection_Problem:
     def __init__(self):
-        self.N = 1000
-        self.T = 100
-        self.d = 10
+        self.N = 10000
+        self.T = 1000
+        self.d = 3
         self.Sigma = torch.eye(self.d)
         self.Lambda = 0
         self.memory = 0

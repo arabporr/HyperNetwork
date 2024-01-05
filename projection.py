@@ -51,7 +51,7 @@ class Projection_Problem:
     def __init__(self):
         self.N = 1000
         self.T = 100
-        self.d = 1
+        self.d = 10
         self.Sigma = torch.eye(self.d)
         self.Lambda = 0
         self.memory = 0
@@ -124,14 +124,10 @@ class Projection_Problem:
             inner_power_arg = Lambda * torch.eye(d).reshape((1, d, d)).repeat(N, 1, 1) +  torch.einsum("n,dk->ndk", Varsigma(x_t_1), Sigma) # N x d x d
             inner_power = torch.linalg.matrix_power(inner_power_arg, 2)
             
-            outer_power_arg = torch.einsum("ndk,lk->ndk", inner_power, sigma_neg_2)
-            outer_power = torch.from_numpy(tf.cast(tf.linalg.sqrtm(tf.cast(outer_power_arg, tf.complex128)), tf.float64).numpy()) # N x d x d    
-            #!!!! Not only it is not stable but also slow -> https://github.com/tensorflow/tensorflow/issues/58334
+            outer_power_arg_torch = torch.einsum("ndk,lk->ndk", inner_power, sigma_neg_2)
+            outer_power_arg_tf = tf.convert_to_tensor(outer_power_arg_torch)
+            outer_power = torch.from_numpy(tf.linalg.sqrtm(outer_power_arg_tf).numpy()) # N x d x d    
 
-            # # Old Method using numpy arrys and scypi
-            # outer_power_arg = np.array(outer_power_arg)
-            # outer_power = torch.from_numpy(np.array([frac_mat_pow(outer_power_arg[i] , 1/2) for i in range(outer_power_arg.shape[0])])).type(torch.FloatTensor) 
-            
             outer_mul = torch.einsum("ndk,lk->ndk", outer_power, sigma_2) # N x d x d
             covariance = torch.einsum("n,ndk->ndk", Varsigma(x_t_1), outer_mul) # N x d x d
 

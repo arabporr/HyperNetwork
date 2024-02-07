@@ -4,9 +4,6 @@ import numpy as np
 ## Imports for plotting
 import matplotlib.pyplot as plt
 
-## Progress bar
-from tqdm.notebook import tqdm
-
 ## PyTorch
 import torch
 import torch.nn as nn
@@ -43,9 +40,9 @@ def fan_diagram(X):
 
 class Projection_Problem:
     def __init__(self):
-        self.N = 10000
-        self.T = 1000
-        self.d = 3
+        self.N = 400
+        self.T = 40
+        self.d = 4
         self.Sigma = torch.eye(self.d)
         self.Lambda = 0
         self.memory = 0
@@ -54,7 +51,7 @@ class Projection_Problem:
         self.Diffusion = []
         self.input_output_pairs = []
     
-    def mu(self, X):
+    def mu(self, X, ind):
         raise NotImplementedError()
 
     def varsigma(self, X):
@@ -83,7 +80,7 @@ class Projection_Problem:
             else:
                 Z = torch.randn(N, d) # N x d 
                 B = torch.bernoulli(torch.tensor([0.5]*N)) # N 
-                drift_t = memory * Mu(X[t-2]) + (1-memory) * Mu(X[t-1]) # N x d 
+                drift_t = memory * Mu(X[t-2], t) + (1-memory) * Mu(X[t-1], t) # N x d 
                 S = torch.einsum("n,dk->ndk", (B * Lambda), torch.eye(d)) # N x d x d
                 diffusion_t = S + torch.einsum("n,dk->ndk", Varsigma(X[t-1]), Sigma) # N x d x d
                 x_t = X[t-1] + drift_t + torch.einsum("nk,nkd->nd", Z, diffusion_t) # N x d
@@ -110,12 +107,13 @@ class Projection_Problem:
         sigma_2 = torch.matrix_power(Sigma,2)
         sigma_neg_2 = torch.matrix_power(torch.linalg.pinv(Sigma), 2)
         Z = []
-        for t in range(1, T+2):
+        for t in range(2, T+2):
+            x_t_2 = X[:, t-2, :]
             x_t_1 = X[:, t-1, :]
             x_t = X[:, t, :]
             drift_t = Drift[:, t, :]
             mu_x_t =  x_t_1 + drift_t # N x d
-            inner_power_arg = Lambda * torch.eye(d).reshape((1, d, d)).repeat(N, 1, 1) +  torch.einsum("n,dk->ndk", Varsigma(x_t_1), Sigma) # N x d x d
+            inner_power_arg = Lambda * torch.eye(d).reshape((1, d, d)).repeat(N, 1, 1) +  torch.einsum("n,dk->ndk", Varsigma(x_t), Sigma) # N x d x d
             inner_power = torch.linalg.matrix_power(inner_power_arg, 2)
             
             outer_power_arg_torch = torch.einsum("ndk,lk->ndk", inner_power, sigma_neg_2)
@@ -123,10 +121,10 @@ class Projection_Problem:
             outer_power = torch.from_numpy(tf.linalg.sqrtm(outer_power_arg_tf).numpy()) # N x d x d    
 
             outer_mul = torch.einsum("ndk,lk->ndk", outer_power, sigma_2) # N x d x d
-            covariance = torch.einsum("n,ndk->ndk", Varsigma(x_t_1), outer_mul) # N x d x d
+            covariance = torch.einsum("n,ndk->ndk", Varsigma(x_t), outer_mul) # N x d x d
 
             Y = [mu_x_t, covariance]
-            Z.append([torch.cat((x_t_1, x_t),dim=-1), Y])
+            Z.append([torch.cat((x_t_2, x_t_1),dim=-1), Y])
         self.input_output_pairs = Z
         return self.input_output_pairs
 
@@ -137,8 +135,8 @@ class OU_Projection_Problem(Projection_Problem):
         self.mean_reversion = 0.5
         self.volitality = 0.001
     
-    def mu(self, X):
-        return (self.long_term_mean - X) * self.mean_reversion
+    def mu(self, X, ind):
+        return (self.long_term_mean - X) * self.mean_reversion + torch.cos(torch.tensor(ind*10))*0.001
 
     def varsigma(self, X):
         return torch.ones(X.shape[0]) * self.volitality

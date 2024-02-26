@@ -2,7 +2,9 @@
 import itertools
 import torch
 import numpy as np
+
 import projection
+import MLP_Handler
 
 seed = 42
 device = (
@@ -47,7 +49,7 @@ params_list_with_states = {
     "N": [400],
     "T": [40],
     "d": [4],
-    "lambda": [0, 0.5, 1],
+    "lambda": [0],
     "memory": [0],
     "sigma": sigmas,
     "mu": mus,
@@ -62,3 +64,4 @@ for data_index, params in enumerate(Permutations):
     parameters = [data_index, params]
     problem = projection.OU_Projection_Problem(parameters)
     problem.Auto_Generate()
+    MLP_Handler.Run(data_index)

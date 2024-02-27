@@ -1,4 +1,3 @@
-import os
 import numpy as np
 
 import torch
@@ -144,14 +143,6 @@ def HN_eval_model(model, data_loader, loss_module):
     print("\t\t---- EVAL RESULTS ----\n", "\t\tAverage loss : ", Average_loss)
 
 
-def HN_predict(model, data):
-    model.eval()
-    with torch.no_grad():
-        data = data.to(device)
-        preds = model(data)
-    return preds
-
-
 def Run(data_index):
     global Directory
     Directory = "HN_Log_problem_" + str(data_index) + "/"
@@ -160,9 +151,9 @@ def Run(data_index):
     PATH = "MLP_Log_problem_" + str(data_index) + "/MLPs_parameters.pt"
     MLPs_parameters = torch.load(PATH)
     MLPs_parameters_count = len(MLPs_parameters[0][2])
-    MLPs_weights_and_biases = []
-    for index in range(len(MLPs_parameters)):
-        MLPs_weights_and_biases.append(MLPs_parameters[index][2])
+    MLPs_weights_and_biases = MLPs_parameters[:][2]
+    # for index in range(len(MLPs_parameters)):
+    #     MLPs_weights_and_biases.append(MLPs_parameters[index][2])
 
     ### Model Training
     print("=" * 20, "\n", "Start working on Hyper Network")

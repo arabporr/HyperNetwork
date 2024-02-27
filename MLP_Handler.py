@@ -91,20 +91,16 @@ class MainNetwork(nn.Module):
 
         layers = []
 
-        layers += [nn.Linear(in_features=(2 * d + 1), out_features=1024)]
+        layers += [nn.Linear(in_features=(2 * d + 1), out_features=256)]
         layers += [nn.LeakyReLU()]
 
-        layers += [nn.Linear(in_features=1024, out_features=512)]
-        layers += [nn.LeakyReLU()]
-
-        layers += [nn.Linear(in_features=512, out_features=256)]
+        layers += [nn.Linear(in_features=256, out_features=256)]
         layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(in_features=256, out_features=128)]
         layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(in_features=128, out_features=((d) + (d * (d + 1) // 2)))]
-        layers += [nn.LeakyReLU()]
         layers += [Exp_layer()]
         self.layers = nn.Sequential(*layers)
 
@@ -295,36 +291,6 @@ def MLP_eval_model(model, data_loader, loss_module, model_index):
     print("---- EVAL RESULTS ----\n", "Average loss : ", Average_loss)
 
 
-def MLP_predict(model, data_loader):
-    results = []
-    with torch.no_grad():
-        for data_inputs, data_labels in data_loader:
-            data_inputs = data_inputs.to(device)
-            preds = model(data_inputs)
-            preds = preds.squeeze(dim=1)
-            results.append(preds)
-    return results
-
-
-def MLP_eval_loss(model, data_loader, loss_module):
-    model.eval()
-    data_index = 0
-    num_preds = 0
-    losses = []
-    with torch.no_grad():
-        for data_inputs, data_labels in data_loader:
-            data_inputs = data_inputs.to(device)
-            data_labels = data_labels.to(device)
-            preds = model(data_inputs)
-            preds = preds.squeeze(dim=1)
-            loss = loss_module(preds, data_labels.float())
-            losses.append(loss)
-            num_preds += data_labels.shape[0]
-            data_index += 1
-    Average_loss = sum(losses) / num_preds
-    return Average_loss
-
-
 ## Creating And Training The MLP Instances
 def DataLoader_for_Model(model_index, test_ratio=0.2, batch_size=1):
     full_dataset = MLPs_datasets[model_index]
@@ -401,12 +367,6 @@ def MainModel_Saver(model, model_index):
     torch.save(model.state_dict(), PATH)
 
 
-def MainModel_Loader(PATH):
-    model = torch.load(PATH)
-    model.eval()
-    return model
-
-
 def Run(data_index):
     global Directory
     Directory = "MLP_Log_problem_" + str(data_index) + "/"
@@ -431,6 +391,10 @@ def Run(data_index):
 
     global MLPs_parameters
     MLPs_parameters = []
+
+    blank_model = MainNetwork()
+    PATH = Directory + "/blank_model_instance.pt"
+    torch.save(blank_model.state_dict(), PATH)
 
     number_of_MLPs = T
     # from (X[0,1] -> mean and cov for T=1) to (X[T-1,T] -> mean and cov for T=T)

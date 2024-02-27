@@ -63,29 +63,26 @@ def Dataset_Generator():
 class Exp_layer(nn.Module):
     def __init__(self):
         super(Exp_layer, self).__init__()
-        self.device = device
-        self.d = d
 
     def forward(self, input_data: torch.tensor):
-        inp = input_data[0]  # 1 x d(d+1)/2
-        inp = inp[self.d :]
-        inp = inp.to(self.device)
+        inp = input_data[0] # 1 x d(d+1)/2
+        inp = inp[d:]
+        inp = inp.to(device)
+        temp = torch.zeros(d,d)
+        temp = temp.to(device)
 
-        temp = torch.zeros(self.d, self.d)
-        temp = temp.to(self.device)
-
-        indices = torch.triu_indices(self.d, self.d)
-        indices.to(self.device)
+        indices = torch.triu_indices(d, d)
+        indices.to(device)
 
         temp[indices[0], indices[1]] = inp
         temp[indices[1], indices[0]] = inp
-
         matrix = torch.linalg.matrix_exp(temp)
 
         result = input_data
-        result[0][self.d :] = matrix[indices[0], indices[1]]
+        result[0][d:] = matrix[indices[0], indices[1]]
 
         return result
+
 
 
 class MainNetwork(nn.Module):
@@ -499,4 +496,3 @@ def Run(data_index):
 
     PATH = Directory + "MLPs_parameters.pt"
     torch.save(MLPs_parameters, PATH)
-    return MLPs_parameters

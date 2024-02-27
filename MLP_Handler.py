@@ -65,10 +65,10 @@ class Exp_layer(nn.Module):
         super(Exp_layer, self).__init__()
 
     def forward(self, input_data: torch.tensor):
-        inp = input_data[0] # 1 x d(d+1)/2
+        inp = input_data[0]  # 1 x d(d+1)/2
         inp = inp[d:]
         inp = inp.to(device)
-        temp = torch.zeros(d,d)
+        temp = torch.zeros(d, d)
         temp = temp.to(device)
 
         indices = torch.triu_indices(d, d)
@@ -82,7 +82,6 @@ class Exp_layer(nn.Module):
         result[0][d:] = matrix[indices[0], indices[1]]
 
         return result
-
 
 
 class MainNetwork(nn.Module):
@@ -384,13 +383,10 @@ def Model_Param_Extractor(model):
     parameters_vectors_values = []
 
     for param_tensor in model.state_dict():
-        parameters_vectors_sizes.append(model.state_dict()[param_tensor].shape)
-        parameters_vectors_sizes_flatten.append(
-            torch.flatten(model.state_dict()[param_tensor]).shape[0]
-        )
-        parameters_vectors_values += torch.flatten(
-            model.state_dict()[param_tensor]
-        ).tolist()
+        layer = model.state_dict()[param_tensor]
+        parameters_vectors_sizes.append(layer.shape)
+        parameters_vectors_sizes_flatten.append(torch.flatten(layer).shape[0])
+        parameters_vectors_values += torch.flatten(layer).tolist()
 
     model_params_and_info = [
         parameters_vectors_sizes,
@@ -401,7 +397,7 @@ def Model_Param_Extractor(model):
 
 
 def MainModel_Saver(model, model_index):
-    PATH = Directory + "/MLP_" + str(model_index) + ".pt"
+    PATH = Directory + "/MLP_model_" + str(model_index) + ".pt"
     torch.save(model.state_dict(), PATH)
 
 
@@ -492,7 +488,7 @@ def Run(data_index):
         print("---- Clearing GPU's cache memory ----")
         torch.cuda.empty_cache()
 
-        print("Done with MLP", index + 1, "\n")
+        print("Done with making MLP", index + 1, "\n")
 
     PATH = Directory + "MLPs_parameters.pt"
     torch.save(MLPs_parameters, PATH)

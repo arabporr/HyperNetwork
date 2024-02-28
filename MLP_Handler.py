@@ -1,5 +1,6 @@
 import os
 import shutil
+
 import numpy as np
 
 import torch
@@ -68,13 +69,14 @@ class Exp_layer(nn.Module):
         super(Exp_layer, self).__init__()
 
     def forward(self, input_data):
-        inp = input_data[0]  # 1 x d(d+1)/2
-        inp = inp[d:]
+        inp = input_data[0]
+        d_ = int((-3 + np.sqrt(9 + 8 * (inp.shape[0]))) / 2)
+        inp = inp[d_:]
         inp = inp.to(device)
-        temp = torch.zeros(d, d)
+        temp = torch.zeros(d_, d_)
         temp = temp.to(device)
 
-        indices = torch.triu_indices(d, d)
+        indices = torch.triu_indices(d_, d_)
         indices.to(device)
 
         temp[indices[0], indices[1]] = inp
@@ -82,7 +84,7 @@ class Exp_layer(nn.Module):
         matrix = torch.linalg.matrix_exp(temp)
 
         result = input_data
-        result[0][d:] = matrix[indices[0], indices[1]]
+        result[0][d_:] = matrix[indices[0], indices[1]]
 
         return result
 
@@ -95,13 +97,13 @@ class MainNetwork(nn.Module):
         layers = []
 
         layers += [nn.Linear(in_features=(2 * d + 1), out_features=256)]
-        layers += [nn.LeakyReLU()]
-
-        layers += [nn.Linear(in_features=256, out_features=256)]
-        layers += [nn.LeakyReLU()]
+        layers += [nn.ReLU()]
 
         layers += [nn.Linear(in_features=256, out_features=128)]
-        layers += [nn.LeakyReLU()]
+        layers += [nn.ReLU()]
+
+        layers += [nn.Linear(in_features=128, out_features=128)]
+        layers += [nn.ReLU()]
 
         layers += [nn.Linear(in_features=128, out_features=((d) + (d * (d + 1) // 2)))]
 
@@ -366,7 +368,7 @@ def Model_Param_Extractor(model):
 
 def MainModel_Saver(model, model_index):
     PATH = Directory + "/MLP_model_" + str(model_index) + ".pt"
-    torch.save(model.state_dict(), PATH)
+    torch.save(model, PATH)
 
 
 def Run(data_index):
@@ -399,7 +401,7 @@ def Run(data_index):
 
     blank_model = MainNetwork()
     PATH = Directory + "/blank_model_instance.pt"
-    torch.save(blank_model.state_dict(), PATH)
+    torch.save(blank_model, PATH)
 
     number_of_MLPs = T
     # from (X[0,1] -> mean and cov for T=1) to (X[T-1,T] -> mean and cov for T=T)
@@ -434,7 +436,7 @@ def Run(data_index):
                 num_epochs=50,
             )
         else:
-            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=0.0004)
+            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=0.0005)
             Model_Trainer(
                 MLP_Model,
                 MLP_train_data,

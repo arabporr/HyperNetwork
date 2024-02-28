@@ -6,6 +6,7 @@ import numpy as np
 import projection
 import MLP_Handler
 import HN_Handler
+import Test_and_plot
 
 seed = 42
 device = (
@@ -66,3 +67,4 @@ for data_index, params in enumerate(Permutations):
     problem.Auto_Generate()
     MLP_Handler.Run(data_index)
     HN_Handler.Run(data_index)
+    Test_and_plot.Run(data_index)

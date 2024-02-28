@@ -1,3 +1,6 @@
+import os
+import shutil
+
 import numpy as np
 
 import torch
@@ -109,7 +112,7 @@ def HN_pred_to_instance(model, data):
     Predicted_MLP = Blank_MLP()
     state_dict_temp = Predicted_MLP.state_dict()
     position = 0
-    for param in enumerate(state_dict_temp):
+    for layer_index, param in enumerate(state_dict_temp):
         layer = state_dict_temp[param]
         layer_size = torch.flatten(layer).shape[0]
         layer_values = predicted_params[position : position + layer_size]
@@ -123,6 +126,11 @@ def HN_pred_to_instance(model, data):
 def Run(data_index):
     global Directory
     Directory = "Testing_Results_problem_" + str(data_index) + "/"
+    if not os.path.exists(Directory):
+        os.mkdir(Directory)
+    else:
+        shutil.rmtree(Directory)
+        os.mkdir(Directory)
 
     global N, T, d
     PATH = "problem_instance_" + str(data_index) + ".pt"
@@ -138,12 +146,14 @@ def Run(data_index):
 
     PATH = "MLP_Log_problem_" + str(data_index) + "/MLPs_parameters.pt"
     MLPs_parameters = torch.load(PATH)
-    MLPs_weights_and_biases = MLPs_parameters[:][2]
+    MLPs_weights_and_biases = []
+    for index in range(len(MLPs_parameters)):
+        MLPs_weights_and_biases.append(MLPs_parameters[index][2])
 
     PATH = "MLP_Log_problem_" + str(data_index) + "/MLPs_Datasets.pt"
     MLPs_datasets = torch.load(PATH)
 
-    logging_dir = Directory + "logger/Pred_VS_Real"
+    logging_dir = Directory + "logger/"
     writer = SummaryWriter(logging_dir)
 
     for input_index in range(len(MLPs_weights_and_biases) - 1):
@@ -152,7 +162,7 @@ def Run(data_index):
             np.array(MLPs_weights_and_biases[input_index])
         ).type(torch.FloatTensor)
         MLP_pred = HN_pred_to_instance(HN_model, input_data).to(device)
-
+        MLP_pred.eval()
         real_MLP_path = (
             "MLP_Log_problem_"
             + str(data_index)
@@ -160,10 +170,9 @@ def Run(data_index):
             + str(output_index)
             + ".pt"
         )
-        Real_state_dict = torch.load(real_MLP_path)
-        MLP_real = Blank_MLP().to(device)
-        MLP_real.load_state_dict(Real_state_dict)
-        MLP_real.eval().to(device)
+        MLP_real = torch.load(real_MLP_path)
+        MLP_real = MLP_real.to(device)
+        MLP_real.eval()
 
         full_dataset = torch.utils.data.DataLoader(
             MLPs_datasets[output_index], batch_size=1, shuffle=False, drop_last=False

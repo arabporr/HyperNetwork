@@ -1,4 +1,5 @@
 import os
+import shutil
 import numpy as np
 
 import torch
@@ -372,6 +373,9 @@ def Run(data_index):
     global Directory
     Directory = "MLP_Log_problem_" + str(data_index) + "/"
     if not os.path.exists(Directory):
+        os.mkdir(Directory)
+    else:
+        shutil.rmtree(Directory)
         os.mkdir(Directory)
 
     global N, T, d, X, Drift, Diffusion, input_output_pairs

@@ -1,16 +1,62 @@
-import os
 import numpy as np
 
 import torch
-import torch.nn as nn
 
 from torch.utils.tensorboard import SummaryWriter
 
-from tqdm.notebook import tqdm
-
+global device
 device = (
     torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda:0")
 )
+print("Device in Test and plot file:", device)
+
+
+class CustomLoss(torch.nn.Module):
+    def __init__(self):
+        super(CustomLoss, self).__init__()
+
+    def forward(self, predictions, targets):
+        preds = predictions[0]  # 1 x d(d+1)/2
+        mu_pred = preds[:d]
+        cov_pred = preds[d:]
+        cov_pred = cov_pred.to(device)
+        temp = torch.zeros(d, d)
+        temp = temp.to(device)
+        indices = torch.triu_indices(d, d)
+        indices.to(device)
+        temp[indices[0], indices[1]] = cov_pred
+        temp[indices[1], indices[0]] = cov_pred
+        cov_pred = temp
+
+        trgt = targets[0]  # 1 x d(d+1)/2
+        mu_trgt = trgt[:d]
+        cov_trgt = trgt[d:]
+        cov_trgt = cov_trgt.to(device)
+        temp = torch.zeros(d, d)
+        temp = temp.to(device)
+        indices = torch.triu_indices(d, d)
+        indices.to(device)
+        temp[indices[0], indices[1]] = cov_trgt
+        temp[indices[1], indices[0]] = cov_trgt
+        cov_trgt = temp
+
+        loss = 0.0
+
+        # Mean Component
+        loss += torch.mean(torch.pow(mu_pred - mu_trgt, 2))
+
+        # Covariant Component
+        A = torch.matmul(torch.linalg.pinv(cov_pred), cov_trgt)
+
+        A = torch.nan_to_num(A)
+
+        A_eigen = torch.linalg.eig(A)
+        A_eigen = A_eigen.eigenvalues
+        A_eigen = torch.real(A_eigen)
+        A_eigen = torch.log(A_eigen) ** 2
+        A_eigen = torch.mean(A_eigen)
+        loss += A_eigen / 2
+        return loss.mean()
 
 
 def HN_predict(model, data):
@@ -78,6 +124,10 @@ def Run(data_index):
     global Directory
     Directory = "Testing_Results_problem_" + str(data_index) + "/"
 
+    global N, T, d
+    PATH = "problem_instance_" + str(data_index) + ".pt"
+    N, T, d = torch.load(PATH)[:3]
+
     global Blank_MLP_Path
     Blank_MLP_Path = "MLP_Log_problem_" + str(data_index) + "/blank_model_instance.pt"
 
@@ -85,8 +135,6 @@ def Run(data_index):
     PATH = "HN_Log_problem_" + str(data_index) + "/HN_model.pt"
     HN_model = torch.load(PATH)
     HN_model.eval()
-
-    ########### TODO, FROM HERE !!!!!
 
     PATH = "MLP_Log_problem_" + str(data_index) + "/MLPs_parameters.pt"
     MLPs_parameters = torch.load(PATH)
@@ -134,6 +182,8 @@ def Run(data_index):
             MLP_eval_loss(MLP_pred, full_dataset, CustomLoss()),
             global_step=output_index,
         )
-        writer.add_scalar("Diff in Preds", Pred_Real_loss, global_step=output_index)
+        writer.add_scalar(
+            "difference in predictions", Pred_Real_loss, global_step=output_index
+        )
 
     writer.close()

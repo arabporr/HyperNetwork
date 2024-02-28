@@ -114,7 +114,6 @@ def HN_train_model(
 def HN_eval_model(model, data_loader, loss_module):
     logging_dir = Directory + "logger/HN_log"
     writer = SummaryWriter(logging_dir)
-    model_plotted = False
 
     model.eval()
 

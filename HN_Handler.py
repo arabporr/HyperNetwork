@@ -7,9 +7,11 @@ from torch.utils.tensorboard import SummaryWriter
 
 from tqdm.notebook import tqdm
 
+global device
 device = (
     torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda:0")
 )
+print("Device in HN_Handler file:", device)
 
 
 ### Dataset creation for HyperNetwork

@@ -13,7 +13,7 @@ global device
 device = (
     torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda:0")
 )
-print("Device in MLP file :", device)
+print("Device in MLP_Handler file:", device)
 
 
 class MLP_Dataset(torch.utils.data.Dataset):

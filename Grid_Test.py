@@ -5,6 +5,7 @@ import numpy as np
 
 import projection
 import MLP_Handler
+import HN_Handler
 
 seed = 42
 device = (
@@ -61,7 +62,7 @@ params_list_with_states = {
 params_perm = list(params_list_with_states.values())
 Permutations = list(itertools.product(*params_perm))
 for data_index, params in enumerate(Permutations):
-    parameters = [data_index, params]
-    problem = projection.OU_Projection_Problem(parameters)
+    problem = projection.OU_Projection_Problem([data_index, params])
     problem.Auto_Generate()
     MLP_Handler.Run(data_index)
+    HN_Handler.Run(data_index)

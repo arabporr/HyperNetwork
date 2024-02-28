@@ -8,9 +8,11 @@ from torch.utils.tensorboard import SummaryWriter
 
 from tqdm.notebook import tqdm
 
+global device
 device = (
     torch.device("cpu") if not torch.cuda.is_available() else torch.device("cuda:0")
 )
+print("Device in MLP file :", device)
 
 
 class MLP_Dataset(torch.utils.data.Dataset):
@@ -49,7 +51,7 @@ class MLP_Dataset(torch.utils.data.Dataset):
 
 def Dataset_Generator():
     MLPs_datasets = []
-    for index in range(1, T):
+    for index in range(T):
         dataset_index = MLP_Dataset(
             input_output_pairs[index][0], input_output_pairs[index][1]
         )
@@ -64,7 +66,7 @@ class Exp_layer(nn.Module):
     def __init__(self):
         super(Exp_layer, self).__init__()
 
-    def forward(self, input_data: torch.tensor):
+    def forward(self, input_data):
         inp = input_data[0]  # 1 x d(d+1)/2
         inp = inp[d:]
         inp = inp.to(device)
@@ -101,6 +103,7 @@ class MainNetwork(nn.Module):
         layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(in_features=128, out_features=((d) + (d * (d + 1) // 2)))]
+
         layers += [Exp_layer()]
         self.layers = nn.Sequential(*layers)
 
@@ -292,7 +295,7 @@ def MLP_eval_model(model, data_loader, loss_module, model_index):
 
 
 ## Creating And Training The MLP Instances
-def DataLoader_for_Model(model_index, test_ratio=0.2, batch_size=1):
+def DataLoader_for_Model(model_index, test_ratio=0.2, batch_size=10):
     full_dataset = MLPs_datasets[model_index]
     test_size = int(test_ratio * len(full_dataset))
     train_size = len(full_dataset) - test_size
@@ -302,9 +305,7 @@ def DataLoader_for_Model(model_index, test_ratio=0.2, batch_size=1):
     train_data_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True, drop_last=True
     )
-    test_data_loader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=False, drop_last=False
-    )
+    test_data_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size)
     return train_data_loader, test_data_loader
 
 

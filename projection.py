@@ -105,7 +105,7 @@ class Projection_Problem:
 
             Y = [mu_x_t, covariance]
             Z.append(
-                [torch.cat((x_t_2, x_t_1, torch.full((self.N, 1), t + 1)), dim=-1), Y]
+                [torch.cat((x_t_2, x_t_1, torch.full((self.N, 1), t - 1)), dim=-1), Y]
             )
         self.input_output_pairs = Z
         return self.input_output_pairs

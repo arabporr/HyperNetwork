@@ -33,9 +33,7 @@ mean_reversion = [0.5]
 
 for ltm in long_term_mean:
     for mr in mean_reversion:
-        mu_func_type1 = (
-            lambda X, ind: (ltm - X) * mr + torch.cos(torch.tensor(ind / 10)) * 0.001
-        )
+        mu_func_type1 = lambda X, ind: (ltm - X) * mr
         mus.append(mu_func_type1)
 
 

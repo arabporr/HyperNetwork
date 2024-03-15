@@ -46,10 +46,10 @@ class Projection_Problem:
             else:
                 Z = torch.randn(self.N, self.d)  # N x d
                 B = torch.bernoulli(torch.tensor([0.5] * self.N))  # N
-                drift_t = self.memory * self.mu(X[t - 2], t) + (
+                drift_t = self.memory * self.mu(X[t - 2], t - 2) + (
                     1 - self.memory
                 ) * self.mu(
-                    X[t - 1], t
+                    X[t - 1], t - 1
                 )  # N x d
                 S = torch.einsum(
                     "n,dk->ndk", (B * self.lambda_), torch.eye(self.d)
@@ -105,7 +105,7 @@ class Projection_Problem:
 
             Y = [mu_x_t, covariance]
             Z.append(
-                [torch.cat((x_t_2, x_t_1, torch.full((self.N, 1), t - 1)), dim=-1), Y]
+                [torch.cat((x_t_2, x_t_1, torch.full((self.N, 1), (t - 1))), dim=-1), Y]
             )
         self.input_output_pairs = Z
         return self.input_output_pairs

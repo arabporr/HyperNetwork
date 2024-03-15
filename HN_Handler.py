@@ -39,7 +39,7 @@ class HN_Dataset(torch.utils.data.Dataset):
 
 def HN_dataset_generator(input, test_split=0.2):
     pos = int((len(input) * (1 - test_split)) - 1)
-    train_dataset = HN_Dataset(input[:pos])
+    train_dataset = HN_Dataset(input[: pos + 1])
     test_dataset = HN_Dataset(input[pos:])
     return (train_dataset, test_dataset)
 
@@ -51,10 +51,16 @@ class HyperNetwork(nn.Module):
         layers = []
 
         layers += [nn.Linear(input_size, 1024)]
-        layers += [nn.ReLU()]
+        layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.ReLU()]
+        layers += [nn.LeakyReLU()]
+
+        layers += [nn.Linear(1024, 1024)]
+        layers += [nn.LeakyReLU()]
+
+        layers += [nn.Linear(1024, 1024)]
+        layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(1024, input_size)]
 
@@ -68,7 +74,7 @@ class HyperNetwork(nn.Module):
 def HN_train_model(
     model, optimizer, data_loader, eval_data_loader, loss_module, num_epochs=100
 ):
-    logging_dir = Directory + "logger/HN_log"
+    logging_dir = Directory + "logger/"
     writer = SummaryWriter(logging_dir)
     model_plotted = False
 
@@ -98,8 +104,6 @@ def HN_train_model(
 
             epoch_loss += loss.item()
 
-        epoch_loss /= len(data_loader)
-        writer.add_scalar("training_loss", epoch_loss, global_step=epoch + 1)
         model.eval()
         epoch_eval_loss = 0.0
 
@@ -111,20 +115,31 @@ def HN_train_model(
                 preds = preds.squeeze(dim=1)
                 loss = loss_module(preds, data_labels.float())
                 epoch_eval_loss += loss.item()
+
+        epoch_loss /= len(data_loader)
+        writer.add_scalar("training_loss", epoch_loss, global_step=epoch + 1)
         epoch_eval_loss /= len(eval_data_loader)
         writer.add_scalar("eval_loss_training", epoch_eval_loss, global_step=epoch + 1)
+        print(
+            "epoch:",
+            epoch,
+            "avg. loss:",
+            epoch_loss,
+            "avg. eval loss:",
+            epoch_eval_loss,
+        )
     writer.close()
 
 
 def HN_eval_model(model, data_loader, loss_module):
-    logging_dir = Directory + "logger/HN_log"
+    logging_dir = Directory + "logger/eval_log"
     writer = SummaryWriter(logging_dir)
 
     model.eval()
 
     num_preds = 0
     losses = []
-    data_index = 0
+    _index = 0
 
     with torch.no_grad():
         for data_inputs, data_labels in data_loader:
@@ -139,8 +154,8 @@ def HN_eval_model(model, data_loader, loss_module):
 
             losses.append(loss)
             num_preds += data_labels.shape[0]
-            data_index += 1
-            writer.add_scalar("eval_loss", loss, global_step=data_index)
+            _index += 1
+            writer.add_scalar("eval_loss", loss, global_step=_index)
 
     writer.close()
     Average_loss = sum(losses) / num_preds
@@ -161,17 +176,23 @@ def Run(data_index):
     MLPs_parameters = torch.load(PATH)
     MLPs_parameters_count = len(MLPs_parameters[0][2])
     MLPs_weights_and_biases = []
-    for index in range(len(MLPs_parameters)):
+    for index in range(2, len(MLPs_parameters)):
         MLPs_weights_and_biases.append(MLPs_parameters[index][2])
 
     ### Model Training
     print("=" * 20, "\n", "Start working on Hyper Network")
     print("---- Creating Datasets ----")
     HN_train_dataset, HN_test_dataset = HN_dataset_generator(
-        MLPs_weights_and_biases, test_split=0.1
+        MLPs_weights_and_biases, test_split=0.2
     )
-    HN_train_data_loader = torch.utils.data.DataLoader(HN_train_dataset, drop_last=True)
-    HN_test_data_loader = torch.utils.data.DataLoader(HN_test_dataset)
+    HN_train_data_loader = torch.utils.data.DataLoader(
+        HN_train_dataset, batch_size=1, shuffle=False, drop_last=True
+    )
+    HN_test_data_loader = torch.utils.data.DataLoader(
+        HN_test_dataset,
+        batch_size=1,
+        shuffle=False,
+    )
 
     print("---- Creating model ----")
     print("input size :", MLPs_parameters_count)
@@ -187,7 +208,7 @@ def Run(data_index):
         HN_train_data_loader,
         HN_test_data_loader,
         HN_loss_module,
-        num_epochs=100,
+        num_epochs=20,
     )
 
     print("---- Evaluating model ----")

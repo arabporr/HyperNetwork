@@ -1,9 +1,13 @@
 import os
 import shutil
+import copy
 
 import numpy as np
 
 import torch
+import tensorflow
+
+from MLP_Handler import CustomLoss
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -19,25 +23,26 @@ class CustomLoss(torch.nn.Module):
         super(CustomLoss, self).__init__()
 
     def forward(self, predictions, targets):
-        preds = predictions[0]  # 1 x d(d+1)/2
-        mu_pred = preds[:d]
-        cov_pred = preds[d:]
+        d_ = int((-3 + np.sqrt(9 + 8 * (targets[0].shape[0]))) / 2)
+        preds = predictions[0]
+        mu_pred = preds[:d_]
+        cov_pred = preds[d_:]
         cov_pred = cov_pred.to(device)
-        temp = torch.zeros(d, d)
+        temp = torch.zeros(d_, d_)
         temp = temp.to(device)
-        indices = torch.triu_indices(d, d)
+        indices = torch.triu_indices(d_, d_)
         indices.to(device)
         temp[indices[0], indices[1]] = cov_pred
         temp[indices[1], indices[0]] = cov_pred
         cov_pred = temp
 
-        trgt = targets[0]  # 1 x d(d+1)/2
-        mu_trgt = trgt[:d]
-        cov_trgt = trgt[d:]
+        trgt = targets[0]
+        mu_trgt = trgt[:d_]
+        cov_trgt = trgt[d_:]
         cov_trgt = cov_trgt.to(device)
-        temp = torch.zeros(d, d)
+        temp = torch.zeros(d_, d_)
         temp = temp.to(device)
-        indices = torch.triu_indices(d, d)
+        indices = torch.triu_indices(d_, d_)
         indices.to(device)
         temp[indices[0], indices[1]] = cov_trgt
         temp[indices[1], indices[0]] = cov_trgt
@@ -46,19 +51,21 @@ class CustomLoss(torch.nn.Module):
         loss = 0.0
 
         # Mean Component
-        loss += torch.mean(torch.pow(mu_pred - mu_trgt, 2))
+        loss += torch.sqrt((mu_pred - mu_trgt) ** 2) ** 2
 
         # Covariant Component
-        A = torch.matmul(torch.linalg.pinv(cov_pred), cov_trgt)
-
-        A = torch.nan_to_num(A)
-
-        A_eigen = torch.linalg.eig(A)
-        A_eigen = A_eigen.eigenvalues
-        A_eigen = torch.real(A_eigen)
-        A_eigen = torch.log(A_eigen) ** 2
-        A_eigen = torch.mean(A_eigen)
-        loss += A_eigen / 2
+        C2_tf = tensorflow.convert_to_tensor(cov_pred)
+        C2_sqrt = torch.from_numpy(tensorflow.linalg.sqrtm(C2_tf).numpy())
+        C2sqrt_C1_C2sqrt = torch.matmul(torch.matmul(C2_sqrt, cov_trgt), C2_sqrt)
+        C2sqrt_C1_C2sqrt_tf = tensorflow.convert_to_tensor(C2sqrt_C1_C2sqrt)
+        SQRT_C2sqrt_C1_C2sqrt = torch.from_numpy(
+            tensorflow.linalg.sqrtm(C2sqrt_C1_C2sqrt_tf).numpy()
+        )
+        inside_trace = cov_trgt + cov_pred + 2 * SQRT_C2sqrt_C1_C2sqrt
+        loss += torch.trace(inside_trace)
+        if torch.sum(loss.isnan()) > 0:
+            print("loss is nan!")
+            raise Exception("Loss is nan!")
         return loss.mean()
 
 
@@ -102,13 +109,11 @@ def MLP_eval_loss(model, data_loader, loss_module):
 
 def Blank_MLP():
     blank_model = torch.load(Blank_MLP_Path)
-    blank_model.eval()
-    return blank_model
+    model_clone = copy.deepcopy(blank_model)
+    return model_clone
 
 
-### Building the predicted MLP
-def HN_pred_to_instance(model, data):
-    predicted_params = HN_predict(model, data)
+def HN_pred_to_instance(predicted_params):
     Predicted_MLP = Blank_MLP()
     state_dict_temp = Predicted_MLP.state_dict()
     position = 0
@@ -147,7 +152,7 @@ def Run(data_index):
     PATH = "MLP_Log_problem_" + str(data_index) + "/MLPs_parameters.pt"
     MLPs_parameters = torch.load(PATH)
     MLPs_weights_and_biases = []
-    for index in range(len(MLPs_parameters)):
+    for index in range(2, len(MLPs_parameters)):
         MLPs_weights_and_biases.append(MLPs_parameters[index][2])
 
     PATH = "MLP_Log_problem_" + str(data_index) + "/MLPs_Datasets.pt"
@@ -157,11 +162,19 @@ def Run(data_index):
     writer = SummaryWriter(logging_dir)
 
     for input_index in range(len(MLPs_weights_and_biases) - 1):
+        print("creating testing visualizations for index:", input_index + 1)
         output_index = input_index + 1
         input_data = torch.from_numpy(
             np.array(MLPs_weights_and_biases[input_index])
         ).type(torch.FloatTensor)
-        MLP_pred = HN_pred_to_instance(HN_model, input_data).to(device)
+        predicted_params = HN_predict(HN_model, input_data)
+        if input_index < 0.8 * len(MLPs_weights_and_biases):
+            last_pred = predicted_params
+        else:
+            last_pred = HN_predict(HN_model, last_pred)
+            MLP_pred_recur = HN_pred_to_instance(last_pred).to(device)
+            MLP_pred_recur.eval()
+        MLP_pred = HN_pred_to_instance(predicted_params).to(device)
         MLP_pred.eval()
         real_MLP_path = (
             "MLP_Log_problem_"
@@ -175,24 +188,62 @@ def Run(data_index):
         MLP_real.eval()
 
         full_dataset = torch.utils.data.DataLoader(
-            MLPs_datasets[output_index], batch_size=1, shuffle=False, drop_last=False
+            MLPs_datasets[output_index + 2],
+            batch_size=1,
+            shuffle=False,
+            drop_last=False,
         )
         PredMLP_preds = torch.cat(MLP_predict(MLP_pred, full_dataset), dim=0)
         RealMLP_preds = torch.cat(MLP_predict(MLP_real, full_dataset), dim=0)
-        Pred_Real_loss = ((PredMLP_preds - RealMLP_preds)).mean()
+        Pred_Real_loss = ((PredMLP_preds - RealMLP_preds) ** 2).mean()
 
-        writer.add_scalar(
-            "Real_MLP_Loss",
-            MLP_eval_loss(MLP_real, full_dataset, CustomLoss()),
-            global_step=output_index,
-        )
-        writer.add_scalar(
-            "Pred_MLP_Loss",
-            MLP_eval_loss(MLP_pred, full_dataset, CustomLoss()),
-            global_step=output_index,
-        )
-        writer.add_scalar(
-            "difference in predictions", Pred_Real_loss, global_step=output_index
-        )
+        if input_index < 0.8 * len(MLPs_weights_and_biases):
+            writer.add_scalars(
+                "Loss Plot",
+                {
+                    "Real MLP's Loss": MLP_eval_loss(
+                        MLP_real, full_dataset, CustomLoss()
+                    ),
+                    "Predicted MLP's Loss": MLP_eval_loss(
+                        MLP_pred, full_dataset, CustomLoss()
+                    ),
+                },
+                global_step=output_index,
+            )
+            writer.add_scalar(
+                "Difference in predictions between Real and Predicted MLP",
+                Pred_Real_loss,
+                global_step=output_index,
+            )
+        else:
+            RecurPredMLP_preds = torch.cat(
+                MLP_predict(MLP_pred_recur, full_dataset), dim=0
+            )
+            RecurPred_Pred_loss = ((RecurPredMLP_preds - PredMLP_preds) ** 2).mean()
+            writer.add_scalars(
+                "Loss Plot",
+                {
+                    "Real MLP's Loss": MLP_eval_loss(
+                        MLP_real, full_dataset, CustomLoss()
+                    ),
+                    "Predicted MLP's Loss": MLP_eval_loss(
+                        MLP_pred, full_dataset, CustomLoss()
+                    ),
+                    "Recurrently Predicted MLP's Loss": MLP_eval_loss(
+                        MLP_pred_recur, full_dataset, CustomLoss()
+                    ),
+                },
+                global_step=output_index,
+            )
+            writer.add_scalar(
+                "Difference in predictions between Real and Predicted MLP",
+                Pred_Real_loss,
+                global_step=output_index,
+            )
+            writer.add_scalar(
+                "Difference in predictions between Predicted and Recurrently Predicted MLP",
+                RecurPred_Pred_loss,
+                global_step=output_index,
+            )
 
     writer.close()

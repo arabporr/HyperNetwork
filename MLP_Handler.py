@@ -69,6 +69,9 @@ class Exp_layer(nn.Module):
         super(Exp_layer, self).__init__()
 
     def forward(self, input_data):
+        if torch.sum(input_data.isnan()) > 0:
+            print("input_data is nan!")
+            raise Exception("input_data is nan in exp layer!")
         inp = input_data[0]
         d_ = int((-3 + np.sqrt(9 + 8 * (inp.shape[0]))) / 2)
         inp = inp[d_:]
@@ -85,7 +88,9 @@ class Exp_layer(nn.Module):
 
         result = input_data
         result[0][d_:] = matrix[indices[0], indices[1]]
-
+        if torch.sum(result.isnan()) > 0:
+            print("result is nan!")
+            raise Exception("result is nan in exp layer!")
         return result
 
 
@@ -111,6 +116,9 @@ class MainNetwork(nn.Module):
         self.layers = nn.Sequential(*layers)
 
     def forward(self, input_data):
+        if torch.sum(input_data.isnan()) > 0:
+            print("input_data is nan!")
+            raise Exception("input_data is nan in first layer!")
         result = self.layers(input_data)
         return result
 
@@ -120,25 +128,26 @@ class CustomLoss(nn.Module):
         super(CustomLoss, self).__init__()
 
     def forward(self, predictions, targets):
-        preds = predictions[0]  # 1 x d(d+1)/2
-        mu_pred = preds[:d]
-        cov_pred = preds[d:]
+        d_ = int((-3 + np.sqrt(9 + 8 * (targets[0].shape[0]))) / 2)
+        preds = predictions[0]
+        mu_pred = preds[:d_]
+        cov_pred = preds[d_:]
         cov_pred = cov_pred.to(device)
-        temp = torch.zeros(d, d)
+        temp = torch.zeros(d_, d_)
         temp = temp.to(device)
-        indices = torch.triu_indices(d, d)
+        indices = torch.triu_indices(d_, d_)
         indices.to(device)
         temp[indices[0], indices[1]] = cov_pred
         temp[indices[1], indices[0]] = cov_pred
         cov_pred = temp
 
-        trgt = targets[0]  # 1 x d(d+1)/2
-        mu_trgt = trgt[:d]
-        cov_trgt = trgt[d:]
+        trgt = targets[0]
+        mu_trgt = trgt[:d_]
+        cov_trgt = trgt[d_:]
         cov_trgt = cov_trgt.to(device)
-        temp = torch.zeros(d, d)
+        temp = torch.zeros(d_, d_)
         temp = temp.to(device)
-        indices = torch.triu_indices(d, d)
+        indices = torch.triu_indices(d_, d_)
         indices.to(device)
         temp[indices[0], indices[1]] = cov_trgt
         temp[indices[1], indices[0]] = cov_trgt
@@ -147,19 +156,18 @@ class CustomLoss(nn.Module):
         loss = 0.0
 
         # Mean Component
-        loss += torch.mean(torch.pow(mu_pred - mu_trgt, 2))
+        loss += torch.mean((mu_pred - mu_trgt) ** 2)
 
         # Covariant Component
         A = torch.matmul(torch.linalg.pinv(cov_pred), cov_trgt)
-
-        A = torch.nan_to_num(A)
-
         A_eigen = torch.linalg.eig(A)
         A_eigen = A_eigen.eigenvalues
-        A_eigen = torch.real(A_eigen)
-        A_eigen = torch.log(A_eigen) ** 2
-        A_eigen = torch.mean(A_eigen)
+        A_eigen = torch.abs(torch.real(A_eigen))
+        A_eigen = torch.mean(torch.log(A_eigen) ** 2)
         loss += A_eigen / 2
+        if torch.sum(loss.isnan()) > 0:
+            print("loss is nan!")
+            raise Exception("Loss is nan!")
         return loss.mean()
 
 
@@ -218,6 +226,8 @@ def MLP_train_model_with_logger(
         # Add average loss to TensorBoard
         epoch_loss /= len(data_loader)
         writer.add_scalar("training_loss", epoch_loss, global_step=epoch + 1)
+        print("\nepoch:", epoch, "avg. loss:", epoch_loss, end=" ")
+
         if with_eval:
             model.eval()
             epoch_eval_loss = 0.0
@@ -229,10 +239,13 @@ def MLP_train_model_with_logger(
                     preds = preds.squeeze(dim=1)
                     loss = loss_module(preds, data_labels.float())
                     epoch_eval_loss += loss.item()
+
             epoch_eval_loss /= len(eval_data_loader)
             writer.add_scalar(
                 "eval_loss_training", epoch_eval_loss, global_step=epoch + 1
             )
+            print("avg. eval loss:", epoch_eval_loss, end=" ")
+
     writer.close()
 
 
@@ -298,7 +311,7 @@ def MLP_eval_model(model, data_loader, loss_module, model_index):
 
 
 ## Creating And Training The MLP Instances
-def DataLoader_for_Model(model_index, test_ratio=0.2, batch_size=10):
+def DataLoader_for_Model(model_index, test_ratio=0.2, batch_size=1):
     full_dataset = MLPs_datasets[model_index]
     test_size = int(test_ratio * len(full_dataset))
     train_size = len(full_dataset) - test_size
@@ -306,7 +319,7 @@ def DataLoader_for_Model(model_index, test_ratio=0.2, batch_size=10):
         full_dataset, [train_size, test_size]
     )
     train_data_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, drop_last=True
+        train_dataset, batch_size=batch_size, drop_last=True
     )
     test_data_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size)
     return train_data_loader, test_data_loader
@@ -416,27 +429,14 @@ def Run(data_index):
             index, test_ratio=0.2, batch_size=1
         )
 
-        if index == 0:
+        if index == 0 or index == 2:
             print("---- Creating model instance ----")
             MLP_Model = Model_Maker()
 
         print("---- Training model instance ----")
         loss_module = CustomLoss()
-        if index <= 2:
-            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=0.001)
-            Model_Trainer(
-                MLP_Model,
-                MLP_train_data,
-                MLP_test_data,
-                optimizer,
-                loss_module,
-                index,
-                with_logger=True,
-                with_eval=True,
-                num_epochs=50,
-            )
-        else:
-            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=0.0005)
+        if index == 2:
+            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=0.01)
             Model_Trainer(
                 MLP_Model,
                 MLP_train_data,
@@ -448,6 +448,21 @@ def Run(data_index):
                 with_eval=True,
                 num_epochs=20,
             )
+        elif index > 2:
+            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=0.005)
+            Model_Trainer(
+                MLP_Model,
+                MLP_train_data,
+                MLP_test_data,
+                optimizer,
+                loss_module,
+                index,
+                with_logger=True,
+                with_eval=True,
+                num_epochs=10,
+            )
+        else:
+            pass
 
         print("---- Extracting model parameters ----")
         MLP_Params_and_Info = Model_Param_Extractor(MLP_Model)

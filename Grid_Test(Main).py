@@ -28,8 +28,8 @@ sigmas.append(torch.eye(4))
 
 
 mus = []
-long_term_mean = [0.01]
-mean_reversion = [0.5]
+long_term_mean = [0.1]
+mean_reversion = [5]
 
 for ltm in long_term_mean:
     for mr in mean_reversion:
@@ -37,7 +37,7 @@ for ltm in long_term_mean:
         mus.append(mu_func_type1)
 
 
-volatility = [0.001]
+volatility = [0.01]
 varsigmas = []
 for vol in volatility:
     varsigma_func_type1 = lambda X: torch.ones(X.shape[0]) * vol
@@ -47,7 +47,7 @@ for vol in volatility:
 # TEST CONFIGURATIONS
 params_list_with_states = {
     "N": [400],
-    "T": [40],
+    "T": [100],
     "d": [4],
     "lambda": [0],
     "memory": [0],

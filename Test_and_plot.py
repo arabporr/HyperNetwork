@@ -18,7 +18,7 @@ device = (
 print("Device in Test and plot file:", device)
 
 
-class CustomLoss(torch.nn.Module):
+class Wasserstein(torch.nn.Module):
     def __init__(self):
         super(CustomLoss, self).__init__()
 

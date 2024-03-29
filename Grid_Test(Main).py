@@ -23,13 +23,13 @@ torch.backends.cudnn.benchmark = False
 
 # Sigma, Mu, and Varsigma values
 sigmas = []
-sigmas.append(torch.eye(4))
+sigmas.append(torch.eye(10))
 # sigma[1], sigma[2], ...
 
 
 mus = []
-long_term_mean = [0.1]
-mean_reversion = [5]
+long_term_mean = [0.01]
+mean_reversion = [0.5]
 
 for ltm in long_term_mean:
     for mr in mean_reversion:
@@ -37,7 +37,7 @@ for ltm in long_term_mean:
         mus.append(mu_func_type1)
 
 
-volatility = [0.01]
+volatility = [0.001]  # , 0.005, 0.01, 0.05, 0.1]
 varsigmas = []
 for vol in volatility:
     varsigma_func_type1 = lambda X: torch.ones(X.shape[0]) * vol
@@ -46,11 +46,11 @@ for vol in volatility:
 
 # TEST CONFIGURATIONS
 params_list_with_states = {
-    "N": [400],
-    "T": [100],
-    "d": [4],
-    "lambda": [0],
-    "memory": [0],
+    "N": [10000],
+    "T": [1000],
+    "d": [10],
+    "lambda": [0],  # , 0.1, 0.25, 0.5, 0.75, 0.9, 1]
+    "memory": [0],  # , 0.1, 0.25, 0.5, 0.75, 0.9, 1]
     "sigma": sigmas,
     "mu": mus,
     "varsigma": varsigmas,

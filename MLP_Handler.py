@@ -101,7 +101,10 @@ class MainNetwork(nn.Module):
 
         layers = []
 
-        layers += [nn.Linear(in_features=(2 * d + 1), out_features=256)]
+        layers += [nn.Linear(in_features=(2 * d + 1), out_features=512)]
+        layers += [nn.ReLU()]
+
+        layers += [nn.Linear(in_features=512, out_features=256)]
         layers += [nn.ReLU()]
 
         layers += [nn.Linear(in_features=256, out_features=128)]
@@ -156,18 +159,19 @@ class CustomLoss(nn.Module):
         loss = 0.0
 
         # Mean Component
-        loss += torch.mean((mu_pred - mu_trgt) ** 2)
+        loss += torch.mean(torch.pow((mu_pred - mu_trgt), 2))
 
         # Covariant Component
         A = torch.matmul(torch.linalg.pinv(cov_pred), cov_trgt)
         A_eigen = torch.linalg.eig(A)
         A_eigen = A_eigen.eigenvalues
-        A_eigen = torch.abs(torch.real(A_eigen))
+        A_eigen = torch.real(A_eigen)
+        A_eigen = torch.clamp(A_eigen, min=1e-20, max=1e20)
         A_eigen = torch.mean(torch.log(A_eigen) ** 2)
         loss += A_eigen / 2
-        if torch.sum(loss.isnan()) > 0:
-            print("loss is nan!")
-            raise Exception("Loss is nan!")
+        if loss.isnan().sum() or loss.isinf().sum():
+            print("loss is nan or inf!")
+            raise Exception("Loss is nan or inf!")
         return loss.mean()
 
 
@@ -184,22 +188,15 @@ def MLP_train_model_with_logger(
     # Create TensorBoard logger
     logging_dir = Directory + "logger/MLP_" + str(model_index)
     writer = SummaryWriter(logging_dir)
-    model_plotted = False
     # Set model to train mode
     model.train()
     # Training loop
     for epoch in tqdm(range(num_epochs)):
         epoch_loss = 0.0
         for data_inputs, data_labels in data_loader:
-
             ## Step 1: Move input data to device (only strictly necessary if we use GPU)
             data_inputs = data_inputs.to(device)
             data_labels = data_labels.to(device)
-
-            # For the very first batch, we visualize the computation graph in TensorBoard
-            if not model_plotted:
-                writer.add_graph(model, data_inputs)
-                model_plotted = True
 
             ## Step 2: Run the model on the input data
             preds = model(data_inputs)
@@ -217,6 +214,7 @@ def MLP_train_model_with_logger(
             # Perform backpropagation
             loss.backward()
 
+            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             ## Step 5: Update the parameters
             optimizer.step()
 
@@ -273,6 +271,8 @@ def MLP_train_model(model, optimizer, data_loader, loss_module, num_epochs):
             # Before calculating the gradients, we need to ensure that they are all zero.
             # The gradients would not be overwritten, but actually added to the existing ones.
             optimizer.zero_grad()
+
+            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             # Perform backpropagation
             loss.backward()
 
@@ -283,7 +283,6 @@ def MLP_train_model(model, optimizer, data_loader, loss_module, num_epochs):
 def MLP_eval_model(model, data_loader, loss_module, model_index):
     logging_dir = Directory + "logger/MLP_" + str(model_index)
     writer = SummaryWriter(logging_dir)
-    model_plotted = False
 
     model.eval()
 
@@ -416,6 +415,8 @@ def Run(data_index):
     PATH = Directory + "/blank_model_instance.pt"
     torch.save(blank_model, PATH)
 
+    global MLP_Model
+
     number_of_MLPs = T
     # from (X[0,1] -> mean and cov for T=1) to (X[T-1,T] -> mean and cov for T=T)
 
@@ -436,20 +437,7 @@ def Run(data_index):
         print("---- Training model instance ----")
         loss_module = CustomLoss()
         if index == 2:
-            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=0.01)
-            Model_Trainer(
-                MLP_Model,
-                MLP_train_data,
-                MLP_test_data,
-                optimizer,
-                loss_module,
-                index,
-                with_logger=True,
-                with_eval=True,
-                num_epochs=20,
-            )
-        elif index > 2:
-            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=0.005)
+            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=1e-4)
             Model_Trainer(
                 MLP_Model,
                 MLP_train_data,
@@ -460,6 +448,19 @@ def Run(data_index):
                 with_logger=True,
                 with_eval=True,
                 num_epochs=10,
+            )
+        elif index > 2:
+            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=1e-5)
+            Model_Trainer(
+                MLP_Model,
+                MLP_train_data,
+                MLP_test_data,
+                optimizer,
+                loss_module,
+                index,
+                with_logger=True,
+                with_eval=True,
+                num_epochs=4,
             )
         else:
             pass

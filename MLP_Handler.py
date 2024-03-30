@@ -110,9 +110,6 @@ class MainNetwork(nn.Module):
         layers += [nn.Linear(in_features=256, out_features=128)]
         layers += [nn.ReLU()]
 
-        layers += [nn.Linear(in_features=128, out_features=128)]
-        layers += [nn.ReLU()]
-
         layers += [nn.Linear(in_features=128, out_features=((d) + (d * (d + 1) // 2)))]
 
         layers += [Exp_layer()]
@@ -310,7 +307,7 @@ def MLP_eval_model(model, data_loader, loss_module, model_index):
 
 
 ## Creating And Training The MLP Instances
-def DataLoader_for_Model(model_index, test_ratio=0.2, batch_size=1):
+def DataLoader_for_Model(model_index, test_ratio=0.2, batch_size=100):
     full_dataset = MLPs_datasets[model_index]
     test_size = int(test_ratio * len(full_dataset))
     train_size = len(full_dataset) - test_size
@@ -450,7 +447,7 @@ def Run(data_index):
                 num_epochs=10,
             )
         elif index > 2:
-            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=1e-5)
+            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=1e-4)
             Model_Trainer(
                 MLP_Model,
                 MLP_train_data,
@@ -460,7 +457,7 @@ def Run(data_index):
                 index,
                 with_logger=True,
                 with_eval=True,
-                num_epochs=4,
+                num_epochs=2,
             )
         else:
             pass

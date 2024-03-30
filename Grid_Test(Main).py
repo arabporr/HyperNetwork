@@ -46,8 +46,8 @@ for vol in volatility:
 
 # TEST CONFIGURATIONS
 params_list_with_states = {
-    "N": [10000],
-    "T": [1000],
+    "N": [1000],
+    "T": [200],
     "d": [10],
     "lambda": [0],  # , 0.1, 0.25, 0.5, 0.75, 0.9, 1]
     "memory": [0],  # , 0.1, 0.25, 0.5, 0.75, 0.9, 1]
@@ -63,6 +63,6 @@ Permutations = list(itertools.product(*params_perm))
 for data_index, params in enumerate(Permutations):
     problem = projection.OU_Projection_Problem([data_index, params])
     problem.Auto_Generate()
-    MLP_Handler.Run(data_index)
-    HN_Handler.Run(data_index)
+    # MLP_Handler.Run(data_index)
+    # HN_Handler.Run(data_index)
     Test_and_plot.Run(data_index)

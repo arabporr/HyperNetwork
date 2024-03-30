@@ -5,7 +5,7 @@ import copy
 import numpy as np
 
 import torch
-import tensorflow
+import tensorflow as tf
 
 from MLP_Handler import CustomLoss
 
@@ -18,55 +18,57 @@ device = (
 print("Device in Test and plot file:", device)
 
 
-class Wasserstein(torch.nn.Module):
-    def __init__(self):
-        super(CustomLoss, self).__init__()
-
-    def forward(self, predictions, targets):
-        d_ = int((-3 + np.sqrt(9 + 8 * (targets[0].shape[0]))) / 2)
-        preds = predictions[0]
-        mu_pred = preds[:d_]
-        cov_pred = preds[d_:]
-        cov_pred = cov_pred.to(device)
+def Wasserstein_Distance(vec1, vec2):
+    Total_Loss = []
+    for v1, v2 in zip(vec1, vec2):
+        d_ = int((-3 + np.sqrt(9 + 8 * (v2.shape[0]))) / 2)
+        mu_v1 = v1[:d_]
+        cov_v1 = v1[d_:]
+        cov_v1 = cov_v1.to(device)
         temp = torch.zeros(d_, d_)
         temp = temp.to(device)
         indices = torch.triu_indices(d_, d_)
         indices.to(device)
-        temp[indices[0], indices[1]] = cov_pred
-        temp[indices[1], indices[0]] = cov_pred
-        cov_pred = temp
+        temp[indices[0], indices[1]] = cov_v1
+        temp[indices[1], indices[0]] = cov_v1
+        cov_v1 = temp
 
-        trgt = targets[0]
-        mu_trgt = trgt[:d_]
-        cov_trgt = trgt[d_:]
-        cov_trgt = cov_trgt.to(device)
+        mu_v2 = v2[:d_]
+        cov_v2 = v2[d_:]
+        cov_v2 = cov_v2.to(device)
         temp = torch.zeros(d_, d_)
         temp = temp.to(device)
         indices = torch.triu_indices(d_, d_)
         indices.to(device)
-        temp[indices[0], indices[1]] = cov_trgt
-        temp[indices[1], indices[0]] = cov_trgt
-        cov_trgt = temp
+        temp[indices[0], indices[1]] = cov_v2
+        temp[indices[1], indices[0]] = cov_v2
+        cov_v2 = temp
 
         loss = 0.0
 
         # Mean Component
-        loss += torch.sqrt((mu_pred - mu_trgt) ** 2) ** 2
+        loss += torch.linalg.vector_norm((mu_v1 - mu_v2), 2)
 
         # Covariant Component
-        C2_tf = tensorflow.convert_to_tensor(cov_pred)
-        C2_sqrt = torch.from_numpy(tensorflow.linalg.sqrtm(C2_tf).numpy())
-        C2sqrt_C1_C2sqrt = torch.matmul(torch.matmul(C2_sqrt, cov_trgt), C2_sqrt)
-        C2sqrt_C1_C2sqrt_tf = tensorflow.convert_to_tensor(C2sqrt_C1_C2sqrt)
+        cov_v1 = cov_v1.to(torch.device("cpu"))
+        cov_v2 = cov_v2.to(torch.device("cpu"))
+        C2_tf = tf.convert_to_tensor(torch.abs(cov_v2))
+        C2_sqrt = torch.from_numpy(tf.linalg.sqrtm(C2_tf).numpy())
+        C2sqrt_C1_C2sqrt = torch.matmul(torch.matmul(C2_sqrt, cov_v1), C2_sqrt)
+        C2sqrt_C1_C2sqrt_tf = tf.convert_to_tensor(torch.abs(C2sqrt_C1_C2sqrt))
         SQRT_C2sqrt_C1_C2sqrt = torch.from_numpy(
-            tensorflow.linalg.sqrtm(C2sqrt_C1_C2sqrt_tf).numpy()
+            tf.linalg.sqrtm(C2sqrt_C1_C2sqrt_tf).numpy()
         )
-        inside_trace = cov_trgt + cov_pred + 2 * SQRT_C2sqrt_C1_C2sqrt
+
+        inside_trace = cov_v1 + cov_v2 - 2 * SQRT_C2sqrt_C1_C2sqrt
         loss += torch.trace(inside_trace)
         if torch.sum(loss.isnan()) > 0:
             print("loss is nan!")
             raise Exception("Loss is nan!")
-        return loss.mean()
+
+        Total_Loss.append(loss.to(torch.device("cpu")))
+    Total_Loss = np.abs(np.array(Total_Loss))
+    return Total_Loss.mean()
 
 
 def HN_predict(model, data):
@@ -88,7 +90,7 @@ def MLP_predict(model, data_loader):
     return results
 
 
-def MLP_eval_loss(model, data_loader, loss_module):
+def MLP_Custom_loss(model, data_loader, loss_module):
     model.eval()
     data_index = 0
     num_preds = 0
@@ -152,7 +154,7 @@ def Run(data_index):
     PATH = "MLP_Log_problem_" + str(data_index) + "/MLPs_parameters.pt"
     MLPs_parameters = torch.load(PATH)
     MLPs_weights_and_biases = []
-    for index in range(2, len(MLPs_parameters)):
+    for index in range(len(MLPs_parameters)):
         MLPs_weights_and_biases.append(MLPs_parameters[index][2])
 
     PATH = "MLP_Log_problem_" + str(data_index) + "/MLPs_Datasets.pt"
@@ -161,7 +163,7 @@ def Run(data_index):
     logging_dir = Directory + "logger/"
     writer = SummaryWriter(logging_dir)
 
-    for input_index in range(len(MLPs_weights_and_biases) - 1):
+    for input_index in range(2, len(MLPs_weights_and_biases) - 1):
         print("creating testing visualizations for index:", input_index + 1)
         output_index = input_index + 1
         input_data = torch.from_numpy(
@@ -188,8 +190,8 @@ def Run(data_index):
         MLP_real.eval()
 
         full_dataset = torch.utils.data.DataLoader(
-            MLPs_datasets[output_index + 2],
-            batch_size=1,
+            MLPs_datasets[output_index],
+            batch_size=100,
             shuffle=False,
             drop_last=False,
         )
@@ -201,10 +203,10 @@ def Run(data_index):
             writer.add_scalars(
                 "Loss Plot",
                 {
-                    "Real MLP's Loss": MLP_eval_loss(
+                    "Real MLP's Loss": MLP_Custom_loss(
                         MLP_real, full_dataset, CustomLoss()
                     ),
-                    "Predicted MLP's Loss": MLP_eval_loss(
+                    "Predicted MLP's Loss": MLP_Custom_loss(
                         MLP_pred, full_dataset, CustomLoss()
                     ),
                 },
@@ -215,6 +217,11 @@ def Run(data_index):
                 Pred_Real_loss,
                 global_step=output_index,
             )
+            writer.add_scalar(
+                "Wasserstein Distance between predictions of Real and Predicted MLP",
+                Wasserstein_Distance(RealMLP_preds, PredMLP_preds),
+                global_step=output_index,
+            )
         else:
             RecurPredMLP_preds = torch.cat(
                 MLP_predict(MLP_pred_recur, full_dataset), dim=0
@@ -223,13 +230,13 @@ def Run(data_index):
             writer.add_scalars(
                 "Loss Plot",
                 {
-                    "Real MLP's Loss": MLP_eval_loss(
+                    "Real MLP's Loss": MLP_Custom_loss(
                         MLP_real, full_dataset, CustomLoss()
                     ),
-                    "Predicted MLP's Loss": MLP_eval_loss(
+                    "Predicted MLP's Loss": MLP_Custom_loss(
                         MLP_pred, full_dataset, CustomLoss()
                     ),
-                    "Recurrently Predicted MLP's Loss": MLP_eval_loss(
+                    "Recurrently Predicted MLP's Loss": MLP_Custom_loss(
                         MLP_pred_recur, full_dataset, CustomLoss()
                     ),
                 },
@@ -243,6 +250,16 @@ def Run(data_index):
             writer.add_scalar(
                 "Difference in predictions between Predicted and Recurrently Predicted MLP",
                 RecurPred_Pred_loss,
+                global_step=output_index,
+            )
+            writer.add_scalar(
+                "Wasserstein Distance between predictions of Real and Predicted MLP",
+                Wasserstein_Distance(RealMLP_preds, PredMLP_preds),
+                global_step=output_index,
+            )
+            writer.add_scalar(
+                "Wasserstein Distance between predictions of Real and Recurrently Predicted MLP",
+                Wasserstein_Distance(RealMLP_preds, RecurPredMLP_preds),
                 global_step=output_index,
             )
 

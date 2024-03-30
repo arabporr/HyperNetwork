@@ -39,7 +39,7 @@ class HN_Dataset(torch.utils.data.Dataset):
 
 def HN_dataset_generator(input, test_split=0.2):
     pos = int((len(input) * (1 - test_split)) - 1)
-    train_dataset = HN_Dataset(input[: pos + 1])
+    train_dataset = HN_Dataset(input[: pos + 2])
     test_dataset = HN_Dataset(input[pos:])
     return (train_dataset, test_dataset)
 
@@ -195,19 +195,18 @@ def Run(data_index):
         MLPs_weights_and_biases, test_split=0.2
     )
     HN_train_data_loader = torch.utils.data.DataLoader(
-        HN_train_dataset, batch_size=1, shuffle=False, drop_last=True
+        HN_train_dataset, batch_size=1, drop_last=True
     )
     HN_test_data_loader = torch.utils.data.DataLoader(
         HN_test_dataset,
         batch_size=1,
-        shuffle=False,
     )
 
     print("---- Creating model ----")
     print("input size :", MLPs_parameters_count)
     HN_model = HyperNetwork(MLPs_parameters_count)
     HN_model = HN_model.to(device)
-    HN_optimizer = torch.optim.Adam(HN_model.parameters(), lr=0.001)
+    HN_optimizer = torch.optim.Adam(HN_model.parameters(), lr=1e-5)
     HN_loss_module = nn.MSELoss()
 
     print("---- Training model ----")
@@ -217,7 +216,7 @@ def Run(data_index):
         HN_train_data_loader,
         HN_test_data_loader,
         HN_loss_module,
-        num_epochs=20,
+        num_epochs=10,
     )
 
     print("---- Evaluating model ----")

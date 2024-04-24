@@ -7,9 +7,6 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-ax = plt.figure(figsize=(10, 10))
-sns.set_style("darkgrid")
-
 import torch
 import tensorflow as tf
 
@@ -290,21 +287,31 @@ def Run(data_index):
             # )
 
     writer.close()
+
+    Directory = "Results_" + str(data_index) + "/"
+    if not os.path.exists(Directory):
+        os.mkdir(Directory)
+    else:
+        shutil.rmtree(Directory)
+        os.mkdir(Directory)
     plots_data_df = pd.DataFrame.from_dict(Plots_Data_Dict).set_index("T")
-    plots_data_df.to_csv("plot_data_" + str(data_index) + ".csv")
+    plots_data_df.to_csv(Directory + "plot_data.csv")
 
     df = plots_data_df.copy()
     df = df.iloc[150:]
+
     ax = plt.figure(figsize=(20, 10))
     sns.set_style("darkgrid")
-    lg = lambda x: np.log10(x)
     plt.title(
         "Loss function values for the outputs of Trained MLPs, Predicted MLPs, and Recurrently Predicted MLPs"
     )
     plt.xlabel("Time (T)")
     plt.ylabel("Log 10 of the loss values (calculated with the formula in paper)")
+
+    lg = lambda x: np.log10(x)
     for col in df.drop(columns=["MSE_Real_vs_Pred"]).columns:
         plt.plot(df[col].apply(lg), label=col)
+
     plt.legend()
-    plt.savefig("Loss_Plot_Problem_" + str(data_index) + ".pdf")
+    plt.savefig(Directory + "Loss_Plot.pdf")
     plt.show()

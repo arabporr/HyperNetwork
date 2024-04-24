@@ -30,6 +30,8 @@ class Projection_Problem:
             self.mu,
             self.varsigma,
         ) = params[1]
+        self.mu = eval(self.mu)
+        self.varsigma = eval(self.varsigma)
 
     def Algorithm3(self):
         X = []
@@ -112,10 +114,13 @@ class Projection_Problem:
 
 
 class OU_Projection_Problem(Projection_Problem):
-    def __init__(self, params):
-        self.data_index = params[0]
+    def __init__(self, data_index):
+        PATH = "Data_Params/params_" + str(data_index) + ".pt"
+        params = torch.load(PATH)
+        self.data_index = data_index
         self.params = params
         super(OU_Projection_Problem, self).__init__(self.params)
+        self.Auto_Generate()
 
     def Auto_Generate(self):
         self.Algorithm3()

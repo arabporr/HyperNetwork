@@ -3,6 +3,12 @@ import shutil
 import copy
 
 import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+ax = plt.figure(figsize=(10, 10))
+sns.set_style("darkgrid")
 
 import torch
 import tensorflow as tf
@@ -31,7 +37,7 @@ def Wasserstein_Distance(vec1, vec2):
         indices.to(device)
         temp[indices[0], indices[1]] = cov_v1
         temp[indices[1], indices[0]] = cov_v1
-        cov_v1 = temp
+        cov_v1 = temp + torch.eye(d_).to(device) * 1e-4
 
         mu_v2 = v2[:d_]
         cov_v2 = v2[d_:]
@@ -42,7 +48,7 @@ def Wasserstein_Distance(vec1, vec2):
         indices.to(device)
         temp[indices[0], indices[1]] = cov_v2
         temp[indices[1], indices[0]] = cov_v2
-        cov_v2 = temp
+        cov_v2 = temp + torch.eye(d_).to(device) * 1e-4
 
         loss = 0.0
 
@@ -52,10 +58,10 @@ def Wasserstein_Distance(vec1, vec2):
         # Covariant Component
         cov_v1 = cov_v1.to(torch.device("cpu"))
         cov_v2 = cov_v2.to(torch.device("cpu"))
-        C2_tf = tf.convert_to_tensor(torch.abs(cov_v2))
+        C2_tf = tf.convert_to_tensor(cov_v2)
         C2_sqrt = torch.from_numpy(tf.linalg.sqrtm(C2_tf).numpy())
         C2sqrt_C1_C2sqrt = torch.matmul(torch.matmul(C2_sqrt, cov_v1), C2_sqrt)
-        C2sqrt_C1_C2sqrt_tf = tf.convert_to_tensor(torch.abs(C2sqrt_C1_C2sqrt))
+        C2sqrt_C1_C2sqrt_tf = tf.convert_to_tensor(C2sqrt_C1_C2sqrt)
         SQRT_C2sqrt_C1_C2sqrt = torch.from_numpy(
             tf.linalg.sqrtm(C2sqrt_C1_C2sqrt_tf).numpy()
         )
@@ -163,7 +169,16 @@ def Run(data_index):
     logging_dir = Directory + "logger/"
     writer = SummaryWriter(logging_dir)
 
+    Plots_Data_Dict = {
+        "MSE_Real_vs_Pred": [],
+        "Accual_Loss_Real": [],
+        "Accual_Loss_Pred": [],
+        "Accual_Loss_Recur_Pred": [],
+        "T": [],
+    }
+
     for input_index in range(2, len(MLPs_weights_and_biases) - 1):
+        Plots_Data_Dict["T"].append(input_index + 1)
         print("creating testing visualizations for index:", input_index + 1)
         output_index = input_index + 1
         input_data = torch.from_numpy(
@@ -198,17 +213,22 @@ def Run(data_index):
         PredMLP_preds = torch.cat(MLP_predict(MLP_pred, full_dataset), dim=0)
         RealMLP_preds = torch.cat(MLP_predict(MLP_real, full_dataset), dim=0)
         Pred_Real_loss = ((PredMLP_preds - RealMLP_preds) ** 2).mean()
+        Plots_Data_Dict["MSE_Real_vs_Pred"].append(Pred_Real_loss.cpu().numpy())
 
         if input_index < 0.8 * len(MLPs_weights_and_biases):
+            Real_Loss = MLP_Custom_loss(MLP_real, full_dataset, CustomLoss())
+            Pred_Loss = MLP_Custom_loss(MLP_pred, full_dataset, CustomLoss())
+            Plots_Data_Dict["Accual_Loss_Real"].append(Real_Loss.cpu().numpy())
+            Plots_Data_Dict["Accual_Loss_Pred"].append(Pred_Loss.cpu().numpy())
+            Plots_Data_Dict["Accual_Loss_Recur_Pred"].append(
+                torch.tensor(0).cpu().numpy()
+            )
+
             writer.add_scalars(
                 "Loss Plot",
                 {
-                    "Real MLP's Loss": MLP_Custom_loss(
-                        MLP_real, full_dataset, CustomLoss()
-                    ),
-                    "Predicted MLP's Loss": MLP_Custom_loss(
-                        MLP_pred, full_dataset, CustomLoss()
-                    ),
+                    "Real MLP's Loss": Real_Loss,
+                    "Predicted MLP's Loss": Pred_Loss,
                 },
                 global_step=output_index,
             )
@@ -217,28 +237,34 @@ def Run(data_index):
                 Pred_Real_loss,
                 global_step=output_index,
             )
-            writer.add_scalar(
-                "Wasserstein Distance between predictions of Real and Predicted MLP",
-                Wasserstein_Distance(RealMLP_preds, PredMLP_preds),
-                global_step=output_index,
-            )
+            # writer.add_scalar(
+            #     "Wasserstein Distance between predictions of Real and Predicted MLP",
+            #     Wasserstein_Distance(RealMLP_preds, PredMLP_preds),
+            #     global_step=output_index,
+            # )
         else:
             RecurPredMLP_preds = torch.cat(
                 MLP_predict(MLP_pred_recur, full_dataset), dim=0
             )
-            RecurPred_Pred_loss = ((RecurPredMLP_preds - PredMLP_preds) ** 2).mean()
+            # RecurPred_Pred_loss = ((RecurPredMLP_preds - PredMLP_preds) ** 2).mean()
+
+            Real_Loss = MLP_Custom_loss(MLP_real, full_dataset, CustomLoss())
+            Pred_Loss = MLP_Custom_loss(MLP_pred, full_dataset, CustomLoss())
+            Recur_Pred_Loss = MLP_Custom_loss(
+                MLP_pred_recur, full_dataset, CustomLoss()
+            )
+            Plots_Data_Dict["Accual_Loss_Real"].append(Real_Loss.cpu().numpy())
+            Plots_Data_Dict["Accual_Loss_Pred"].append(Pred_Loss.cpu().numpy())
+            Plots_Data_Dict["Accual_Loss_Recur_Pred"].append(
+                Recur_Pred_Loss.cpu().numpy()
+            )
+
             writer.add_scalars(
                 "Loss Plot",
                 {
-                    "Real MLP's Loss": MLP_Custom_loss(
-                        MLP_real, full_dataset, CustomLoss()
-                    ),
-                    "Predicted MLP's Loss": MLP_Custom_loss(
-                        MLP_pred, full_dataset, CustomLoss()
-                    ),
-                    "Recurrently Predicted MLP's Loss": MLP_Custom_loss(
-                        MLP_pred_recur, full_dataset, CustomLoss()
-                    ),
+                    "Real MLP's Loss": Real_Loss,
+                    "Predicted MLP's Loss": Pred_Loss,
+                    "Recurrently Predicted MLP's Loss": Recur_Pred_Loss,
                 },
                 global_step=output_index,
             )
@@ -247,20 +273,38 @@ def Run(data_index):
                 Pred_Real_loss,
                 global_step=output_index,
             )
-            writer.add_scalar(
-                "Difference in predictions between Predicted and Recurrently Predicted MLP",
-                RecurPred_Pred_loss,
-                global_step=output_index,
-            )
-            writer.add_scalar(
-                "Wasserstein Distance between predictions of Real and Predicted MLP",
-                Wasserstein_Distance(RealMLP_preds, PredMLP_preds),
-                global_step=output_index,
-            )
-            writer.add_scalar(
-                "Wasserstein Distance between predictions of Real and Recurrently Predicted MLP",
-                Wasserstein_Distance(RealMLP_preds, RecurPredMLP_preds),
-                global_step=output_index,
-            )
+            # writer.add_scalar(
+            #     "Difference in predictions between Predicted and Recurrently Predicted MLP",
+            #     RecurPred_Pred_loss,
+            #     global_step=output_index,
+            # )
+            # writer.add_scalar(
+            #     "Wasserstein Distance between predictions of Real and Predicted MLP",
+            #     Wasserstein_Distance(RealMLP_preds, PredMLP_preds),
+            #     global_step=output_index,
+            # )
+            # writer.add_scalar(
+            #     "Wasserstein Distance between predictions of Real and Recurrently Predicted MLP",
+            #     Wasserstein_Distance(RealMLP_preds, RecurPredMLP_preds),
+            #     global_step=output_index,
+            # )
 
     writer.close()
+    plots_data_df = pd.DataFrame.from_dict(Plots_Data_Dict).set_index("T")
+    plots_data_df.to_csv("plot_data_" + str(data_index) + ".csv")
+
+    df = plots_data_df.copy()
+    df = df.iloc[150:]
+    ax = plt.figure(figsize=(20, 10))
+    sns.set_style("darkgrid")
+    lg = lambda x: np.log10(x)
+    plt.title(
+        "Loss function values for the outputs of Trained MLPs, Predicted MLPs, and Recurrently Predicted MLPs"
+    )
+    plt.xlabel("Time (T)")
+    plt.ylabel("Log 10 of the loss values (calculated with the formula in paper)")
+    for col in df.drop(columns=["MSE_Real_vs_Pred"]).columns:
+        plt.plot(df[col].apply(lg), label=col)
+    plt.legend()
+    plt.savefig("Loss_Plot_Problem_" + str(data_index) + ".pdf")
+    plt.show()

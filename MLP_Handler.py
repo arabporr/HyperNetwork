@@ -102,13 +102,13 @@ class MainNetwork(nn.Module):
         layers = []
 
         layers += [nn.Linear(in_features=(2 * d + 1), out_features=512)]
-        layers += [nn.ReLU()]
+        layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(in_features=512, out_features=256)]
-        layers += [nn.ReLU()]
+        layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(in_features=256, out_features=128)]
-        layers += [nn.ReLU()]
+        layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(in_features=128, out_features=((d) + (d * (d + 1) // 2)))]
 
@@ -444,7 +444,7 @@ def Run(data_index):
                 index,
                 with_logger=True,
                 with_eval=True,
-                num_epochs=10,
+                num_epochs=20,
             )
         elif index > 2:
             optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=1e-4)
@@ -457,7 +457,7 @@ def Run(data_index):
                 index,
                 with_logger=True,
                 with_eval=True,
-                num_epochs=2,
+                num_epochs=5,
             )
         else:
             pass

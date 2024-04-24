@@ -51,25 +51,25 @@ class HyperNetwork(nn.Module):
         layers = []
 
         layers += [nn.Linear(input_size, 1024)]
-        layers += [nn.ReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.ReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.ReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.ReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.ReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.ReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.ReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(1024, input_size)]
 

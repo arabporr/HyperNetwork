@@ -51,25 +51,25 @@ class HyperNetwork(nn.Module):
         layers = []
 
         layers += [nn.Linear(input_size, 1024)]
-        layers += [nn.Tanh()]
+        layers += [nn.ReLU()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.Tanh()]
+        layers += [nn.ReLU()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.Tanh()]
+        layers += [nn.ReLU()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.Tanh()]
+        layers += [nn.ReLU()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.Tanh()]
+        layers += [nn.ReLU()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.Tanh()]
+        layers += [nn.ReLU()]
 
         layers += [nn.Linear(1024, 1024)]
-        layers += [nn.Tanh()]
+        layers += [nn.ReLU()]
 
         layers += [nn.Linear(1024, input_size)]
 
@@ -216,7 +216,7 @@ def Run(data_index):
         HN_train_data_loader,
         HN_test_data_loader,
         HN_loss_module,
-        num_epochs=10,
+        num_epochs=100,
     )
 
     print("---- Evaluating model ----")

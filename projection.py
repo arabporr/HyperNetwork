@@ -30,6 +30,7 @@ class Projection_Problem:
             self.mu,
             self.varsigma,
         ) = params[1]
+        self.sigma = eval(self.sigma)
         self.mu = eval(self.mu)
         self.varsigma = eval(self.varsigma)
 

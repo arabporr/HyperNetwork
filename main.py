@@ -2,7 +2,6 @@ import projection
 import MLP_Handler
 import HN_Handler
 import Test_and_plot
-import os
 import shutil
 
 from argparse import ArgumentParser

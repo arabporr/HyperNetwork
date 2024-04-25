@@ -24,7 +24,7 @@ torch.backends.cudnn.benchmark = False
 
 ## SIGMA
 sigmas = []
-sigmas.append(torch.eye(10))
+sigmas.append("torch.eye(self.d)")
 
 
 ## MU
@@ -51,7 +51,7 @@ for vol in volatility:
 params_list_with_states = {
     "N": [1000],
     "T": [200],
-    "d": [10, 2, 5, 10, 20],
+    "d": [2, 5, 10, 20],
     "lambda": [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1],
     "memory": [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1],
     "sigma": sigmas,
@@ -59,6 +59,16 @@ params_list_with_states = {
     "varsigma": varsigmas,
 }
 
+default_values = {
+    "N": [1000],
+    "T": [200],
+    "d": [10],
+    "lambda": [0.1],
+    "memory": [0.5],
+    "sigma": ["torch.eye(self.d)"],
+    "mu": ["lambda X, ind: (0.01 - X) * 0.5"],
+    "varsigma": ["lambda X: torch.ones(X.shape[0]) * 0.001"],
+}
 
 # Generating Data Params
 Directory = "Data_Params/"
@@ -67,19 +77,39 @@ if not os.path.exists(Directory):
 else:
     shutil.rmtree(Directory)
     os.mkdir(Directory)
-params_perm = list(params_list_with_states.values())
-Permutations = list(itertools.product(*params_perm))
+
+
+# De we need all permutation (Grid search for all the param simultaneity or one by one)
+all_permutations = False
+if all_permutations:
+    params_perm = list(params_list_with_states.values())
+    Permutations = list(itertools.product(*params_perm))
+else:
+    Permutations = set()
+    key_index = 0
+    def_params = list(list(itertools.product(*list(default_values.values())))[0])
+    for key, values in params_list_with_states.items():
+        for replacement in values:
+            new_params = def_params.copy()
+            new_params[key_index] = replacement
+            Permutations.add(tuple(new_params))
+        key_index += 1
+    Permutations = list(Permutations)
+
 Permutations_Count = len(Permutations)
+
+file = open("permutations_list.txt", "w")
 for data_index, params in enumerate(Permutations):
     projection_input = [data_index, params]
+    file.write(str(projection_input) + "\n")
     torch.save(projection_input, "Data_Params/params_" + str(data_index) + ".pt")
-
+file.close()
 print(Permutations_Count, "permutations generated and saved in: Data_Params/")
 
 
 file = open("Commands.sh", "w")
 for i in range(Permutations_Count):
-    file.write(f"python main.py --data_index {i}\n")
+    file.write(f"python3 main.py --data_index {i}\n")
 file.close()
 
 print("Commands for running each problem generated and saved at: Commands.sh")

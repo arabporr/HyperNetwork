@@ -206,7 +206,7 @@ def Run(data_index):
     print("input size :", MLPs_parameters_count)
     HN_model = HyperNetwork(MLPs_parameters_count)
     HN_model = HN_model.to(device)
-    HN_optimizer = torch.optim.Adam(HN_model.parameters(), lr=1e-5)
+    HN_optimizer = torch.optim.Adam(HN_model.parameters(), lr=1e-4)
     HN_loss_module = nn.MSELoss()
 
     print("---- Training model ----")

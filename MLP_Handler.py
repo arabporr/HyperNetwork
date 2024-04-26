@@ -102,16 +102,16 @@ class MainNetwork(nn.Module):
         layers = []
 
         layers += [nn.Linear(in_features=(2 * d + 1), out_features=512)]
-        layers += [nn.ReLU()]
+        layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(in_features=512, out_features=256)]
-        layers += [nn.ReLU()]
+        layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(in_features=256, out_features=256)]
-        layers += [nn.ReLU()]
+        layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(in_features=256, out_features=128)]
-        layers += [nn.ReLU()]
+        layers += [nn.LeakyReLU()]
 
         layers += [nn.Linear(in_features=128, out_features=((d) + (d * (d + 1) // 2)))]
 

@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task 6
 #SBATCH --mem=20G
 #SBATCH --gres=gpu:rtx6000:1
-#SBATCH --time=07:00:00
+#SBATCH --time=07:30:00
 #SBATCH --nodes=5
 #SBATCH --ntasks-per-node=5
 #SBATCH --array=1-25
@@ -15,7 +15,7 @@
 module purge
 module load python/3.12.0
 pip3 install --upgrade pip
-pip3 install pandas numpy tensorflow cuda-python torch torchvision seaborn plotly matplotlib ipywidgets tqdm
+pip3 -U -q install pandas numpy tensorflow cuda-python torch torchvision seaborn plotly matplotlib ipywidgets tqdm
 
 # Run experiment
-sed -n "${SLURM_ARRAY_TASK_ID}p" test_com.sh | bash
+sed -n "${SLURM_ARRAY_TASK_ID}p" Commands.sh | bash

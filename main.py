@@ -2,6 +2,7 @@ import projection
 import MLP_Handler
 import HN_Handler
 import Test_and_plot
+import os
 import shutil
 
 from argparse import ArgumentParser
@@ -21,7 +22,8 @@ Test_and_plot.Run(data_index)
 
 
 try:
-    destination_path = "/h/rezad/"
+    destination_path = "/h/rezad/Run_Results_1/" + "res_" + str(data_index) + "/"
+    os.makedirs(destination_path, exist_ok=True)
     source_path_data = "problem_instance_" + str(data_index) + ".pt"
     source_path_mlp_params = (
         "MLP_Log_problem_" + str(data_index) + "/MLPs_parameters.pt"

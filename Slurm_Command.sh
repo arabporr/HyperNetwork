@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=HN_Run_1
 #SBATCH --qos=m2
-#SBATCH --cpus-per-task 4
+#SBATCH --cpus-per-task 6
 #SBATCH --mem=20G
 #SBATCH --gres=gpu:rtx6000:1
-#SBATCH --time=04:00:00
+#SBATCH --time=07:00:00
 #SBATCH --nodes=5
 #SBATCH --ntasks-per-node=5
 #SBATCH --array=1-25

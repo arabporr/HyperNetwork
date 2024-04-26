@@ -206,7 +206,7 @@ def Run(data_index):
     print("input size :", MLPs_parameters_count)
     HN_model = HyperNetwork(MLPs_parameters_count)
     HN_model = HN_model.to(device)
-    HN_optimizer = torch.optim.Adam(HN_model.parameters(), lr=1e-4)
+    HN_optimizer = torch.optim.Adam(HN_model.parameters(), lr=1e-3)
     HN_loss_module = nn.MSELoss()
 
     print("---- Training model ----")
@@ -216,7 +216,7 @@ def Run(data_index):
         HN_train_data_loader,
         HN_test_data_loader,
         HN_loss_module,
-        num_epochs=100,
+        num_epochs=40,
     )
 
     print("---- Evaluating model ----")

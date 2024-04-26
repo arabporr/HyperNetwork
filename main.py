@@ -21,7 +21,7 @@ Test_and_plot.Run(data_index)
 
 
 if Mem_Optimize:
-    shutil.rmtree("problem_instance_" + str(data_index))
+    shutil.rmtree("problem_instance_" + str(data_index) + ".pt")
     shutil.rmtree("MLP_Log_problem_" + str(data_index))
     shutil.rmtree("HN_Log_problem_" + str(data_index))
     shutil.rmtree("Testing_Results_problem_" + str(data_index))

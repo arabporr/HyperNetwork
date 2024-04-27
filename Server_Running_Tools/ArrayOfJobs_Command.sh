@@ -5,8 +5,8 @@
 #SBATCH --mem=20G
 #SBATCH --gres=gpu:rtx6000:1
 #SBATCH --time=07:30:00
-#SBATCH --nodes=5
-#SBATCH --ntasks-per-node=5
+#SBATCH --nodes=10
+#SBATCH --ntasks-per-node=3
 #SBATCH --array=1-25
 #SBATCH --output=outputs/test_%A_%a.out
 #SBATCH --error=errors/test_%A_%a.err

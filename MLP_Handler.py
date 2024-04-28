@@ -102,16 +102,16 @@ class MainNetwork(nn.Module):
         layers = []
 
         layers += [nn.Linear(in_features=(2 * d + 1), out_features=512)]
-        layers += [nn.LeakyReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(in_features=512, out_features=256)]
-        layers += [nn.LeakyReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(in_features=256, out_features=256)]
-        layers += [nn.LeakyReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(in_features=256, out_features=128)]
-        layers += [nn.LeakyReLU()]
+        layers += [nn.Tanh()]
 
         layers += [nn.Linear(in_features=128, out_features=((d) + (d * (d + 1) // 2)))]
 
@@ -214,7 +214,7 @@ def MLP_train_model_with_logger(
             # Perform backpropagation
             loss.backward()
 
-            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            # nn.utils.clip_grad_value_(model.parameters(), 1.0) #### IMPORTANT: if using ReLU or other unbounded activation functions, this line is recommended to limit gradients for numerical stability
             ## Step 5: Update the parameters
             optimizer.step()
 

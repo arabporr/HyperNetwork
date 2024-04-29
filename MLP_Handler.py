@@ -437,7 +437,7 @@ def Run(data_index):
         print("---- Training model instance ----")
         loss_module = CustomLoss()
         if index == 2:
-            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=1e-4)
+            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=1e-5)
             Model_Trainer(
                 MLP_Model,
                 MLP_train_data,
@@ -450,7 +450,7 @@ def Run(data_index):
                 num_epochs=40,
             )
         elif index > 2:
-            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=1e-4)
+            optimizer = torch.optim.Adam(MLP_Model.parameters(), lr=1e-5)
             Model_Trainer(
                 MLP_Model,
                 MLP_train_data,
@@ -460,7 +460,7 @@ def Run(data_index):
                 index,
                 with_logger=True,
                 with_eval=True,
-                num_epochs=10,
+                num_epochs=20,
             )
         else:
             pass

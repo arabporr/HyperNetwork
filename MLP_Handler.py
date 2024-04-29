@@ -172,7 +172,7 @@ class CustomLoss(nn.Module):
         if loss.isnan().sum() or loss.isinf().sum():
             print("loss is nan or inf!")
             raise Exception("Loss is nan or inf!")
-        return loss.mean()
+        return loss.sum()
 
 
 def MLP_train_model_with_logger(
@@ -460,7 +460,7 @@ def Run(data_index):
                 index,
                 with_logger=True,
                 with_eval=True,
-                num_epochs=20,
+                num_epochs=10,
             )
         else:
             pass

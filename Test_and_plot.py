@@ -95,7 +95,6 @@ def MLP_predict(model, data_loader):
 
 def MLP_Custom_loss(model, data_loader, loss_module):
     model.eval()
-    data_index = 0
     num_preds = 0
     losses = []
     with torch.no_grad():
@@ -107,7 +106,6 @@ def MLP_Custom_loss(model, data_loader, loss_module):
             loss = loss_module(preds, data_labels.float())
             losses.append(loss)
             num_preds += data_labels.shape[0]
-            data_index += 1
     Average_loss = sum(losses) / num_preds
     return Average_loss
 
@@ -168,9 +166,9 @@ def Run(data_index):
 
     Plots_Data_Dict = {
         "MSE_Real_vs_Pred": [],
-        "Accual_Loss_Real": [],
-        "Accual_Loss_Pred": [],
-        "Accual_Loss_Recur_Pred": [],
+        "Loss_Real": [],
+        "Loss_Pred": [],
+        "Loss_Recur_Pred": [],
         "T": [],
     }
 
@@ -215,11 +213,9 @@ def Run(data_index):
         if input_index < 0.8 * len(MLPs_weights_and_biases):
             Real_Loss = MLP_Custom_loss(MLP_real, full_dataset, CustomLoss())
             Pred_Loss = MLP_Custom_loss(MLP_pred, full_dataset, CustomLoss())
-            Plots_Data_Dict["Accual_Loss_Real"].append(Real_Loss.cpu().numpy())
-            Plots_Data_Dict["Accual_Loss_Pred"].append(Pred_Loss.cpu().numpy())
-            Plots_Data_Dict["Accual_Loss_Recur_Pred"].append(
-                torch.tensor(0).cpu().numpy()
-            )
+            Plots_Data_Dict["Loss_Real"].append(Real_Loss.cpu().numpy())
+            Plots_Data_Dict["Loss_Pred"].append(Pred_Loss.cpu().numpy())
+            Plots_Data_Dict["Loss_Recur_Pred"].append(torch.tensor(0).cpu().numpy())
 
             writer.add_scalars(
                 "Loss Plot",
@@ -240,21 +236,18 @@ def Run(data_index):
             #     global_step=output_index,
             # )
         else:
-            RecurPredMLP_preds = torch.cat(
+            RecurPred_preds = torch.cat(
                 MLP_predict(MLP_pred_recur, full_dataset), dim=0
             )
-            # RecurPred_Pred_loss = ((RecurPredMLP_preds - PredMLP_preds) ** 2).mean()
-
+            RecurPred_Pred_loss = ((RecurPred_preds - PredMLP_preds) ** 2).mean()
             Real_Loss = MLP_Custom_loss(MLP_real, full_dataset, CustomLoss())
             Pred_Loss = MLP_Custom_loss(MLP_pred, full_dataset, CustomLoss())
             Recur_Pred_Loss = MLP_Custom_loss(
                 MLP_pred_recur, full_dataset, CustomLoss()
             )
-            Plots_Data_Dict["Accual_Loss_Real"].append(Real_Loss.cpu().numpy())
-            Plots_Data_Dict["Accual_Loss_Pred"].append(Pred_Loss.cpu().numpy())
-            Plots_Data_Dict["Accual_Loss_Recur_Pred"].append(
-                Recur_Pred_Loss.cpu().numpy()
-            )
+            Plots_Data_Dict["Loss_Real"].append(Real_Loss.cpu().numpy())
+            Plots_Data_Dict["Loss_Pred"].append(Pred_Loss.cpu().numpy())
+            Plots_Data_Dict["Loss_Recur_Pred"].append(Recur_Pred_Loss.cpu().numpy())
 
             writer.add_scalars(
                 "Loss Plot",
@@ -270,11 +263,11 @@ def Run(data_index):
                 Pred_Real_loss,
                 global_step=output_index,
             )
-            # writer.add_scalar(
-            #     "Difference in predictions between Predicted and Recurrently Predicted MLP",
-            #     RecurPred_Pred_loss,
-            #     global_step=output_index,
-            # )
+            writer.add_scalar(
+                "Difference in predictions between Predicted and Recurrently Predicted MLP",
+                RecurPred_Pred_loss,
+                global_step=output_index,
+            )
             # writer.add_scalar(
             #     "Wasserstein Distance between predictions of Real and Predicted MLP",
             #     Wasserstein_Distance(RealMLP_preds, PredMLP_preds),
@@ -282,7 +275,7 @@ def Run(data_index):
             # )
             # writer.add_scalar(
             #     "Wasserstein Distance between predictions of Real and Recurrently Predicted MLP",
-            #     Wasserstein_Distance(RealMLP_preds, RecurPredMLP_preds),
+            #     Wasserstein_Distance(RealMLP_preds, RecurPred_preds),
             #     global_step=output_index,
             # )
 
@@ -300,18 +293,21 @@ def Run(data_index):
     df = plots_data_df.copy()
     df = df.iloc[150:]
 
-    ax = plt.figure(figsize=(20, 10))
+    ax = plt.figure(figsize=(14, 7))
     sns.set_style("darkgrid")
+    font = {"family": "normal", "size": 16}
+    plt.rc("font", **font)
     plt.title(
-        "Loss function values for the outputs of Trained MLPs, Predicted MLPs, and Recurrently Predicted MLPs"
+        "Test set performance wrt. intrinsic loss of GDNs, HGNs, and Recurrently Predicted HGNs"
     )
-    plt.xlabel("Time (T)")
-    plt.ylabel("Log 10 of the loss values (calculated with the formula in paper)")
+    plt.xlabel("Time (t)")
+    plt.ylabel("Intrinsic loss (" + r"$log_{10}$" + ")")
 
-    lg = lambda x: np.log10(x)
-    for col in df.drop(columns=["MSE_Real_vs_Pred"]).columns:
-        plt.plot(df[col].apply(lg), label=col)
+    plt.plot(df["Loss_Real"].apply(lambda x: np.log10(x)), label="GDN")
+    plt.plot(df["Loss_Pred"].apply(lambda x: np.log10(x)), label="HGN (1 step)")
+    plt.plot(df["Loss_Recur_Pred"].apply(lambda x: np.log10(x)), label="HGN (w. rec)")
 
     plt.legend()
     plt.savefig(Directory + "Loss_Plot.pdf")
     plt.show()
+    plt.close()
